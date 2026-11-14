@@ -53,18 +53,20 @@ pub struct Skin {
 }
 
 impl Skin {
-    /// Popamp's own skin, sharp at any scale. The player's default skin,
-    /// and where every other skin takes what it leaves out.
-    pub fn builtin_vector() -> Skin {
+    /// Popamp's own skin, sharp at any scale, in the colour set `colors`
+    /// (by name; its first set when it has none of that name). The player's
+    /// default skin, and where every other skin takes what it leaves out.
+    pub fn builtin_vector(colors: Option<&str>) -> Skin {
         // The vector skin of the popamp-skin-default repository, built in.
         let files = popamp_skin_default::FILES.iter().map(|(name, data)| (name.to_string(), data.to_vec())).collect();
         // The files are part of the program; a test loads them.
-        vector::load_onto(Skin::bare(), &files, None).expect("the built-in skin loads")
+        vector::load_onto(Skin::bare(), &files, colors).expect("the built-in skin loads")
     }
 
     /// The built-in skin as x1 bitmaps, for classic skins to fall back on.
+    /// A classic skin has one look: the built-in skin's colour sets are not its.
     pub fn builtin() -> Skin {
-        Skin { vector: false, svgs: svg::Svgs::default(), sheet_svgs: HashMap::new(), ..Skin::builtin_vector() }
+        Skin { vector: false, svgs: svg::Svgs::default(), sheet_svgs: HashMap::new(), color_sets: Vec::new(), color_set: 0, ..Skin::builtin_vector(None) }
     }
 
     /// A skin with nothing in it, to load the built-in one onto.
@@ -352,7 +354,7 @@ mod tests {
 
     #[test]
     fn the_built_in_skin_is_the_vector_skin_folder() {
-        let skin = Skin::builtin_vector();
+        let skin = Skin::builtin_vector(None);
         assert_eq!(skin.name, "Popamp Default");
         assert!(skin.vector);
         assert_eq!(skin.sheet_svgs.len(), Sheet::ALL.len() - 1, "all but nums_ex");
@@ -360,6 +362,17 @@ mod tests {
         assert!(!skin.has_nums_ex(), "its clock uses numbers");
         let classic = Skin::builtin();
         assert!(!classic.vector && classic.sheet_svgs.is_empty(), "x1 bitmaps for classic skins");
+        assert!(classic.color_sets.is_empty(), "classic skins have one look");
+    }
+
+    #[test]
+    fn the_built_in_skin_comes_in_the_colour_set_asked_for() {
+        let first = Skin::builtin_vector(None);
+        assert!(first.color_sets.len() > 1, "the built-in skin has colour sets");
+        let last = first.color_sets.last().unwrap().clone();
+        let other = Skin::builtin_vector(Some(&last));
+        assert_eq!(other.color_set, first.color_sets.len() - 1);
+        assert_ne!(other.sheet(Sheet::Main).px, first.sheet(Sheet::Main).px, "another set paints the pictures");
     }
 
     #[test]

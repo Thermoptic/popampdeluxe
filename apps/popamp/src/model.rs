@@ -257,6 +257,7 @@ impl Model {
         let scanned = Arc::new(Scanned::load(&paths.replaygain_file()));
         let format = Format::cached(&config.settings.titlefmt);
         let library = crate::library::LibraryPane::new(popamp_core::library::Library::load(&paths.library_file()));
+        let skin = Skin::builtin_vector(Some(&config.settings.skin_colors));
         let mut m = Model {
             library,
             paths,
@@ -264,7 +265,7 @@ impl Model {
             playlist: Playlist::new(),
             engine,
             format,
-            skin: Skin::builtin_vector(),
+            skin,
             skin_path: None,
             skin_changed_at: None,
             status: Status::default(),
@@ -793,7 +794,7 @@ impl Model {
 
     pub fn set_skin(&mut self, path: Option<PathBuf>) {
         match &path {
-            None => self.skin = Skin::builtin_vector(),
+            None => self.skin = self.builtin_skin(),
             Some(p) => match self.load_skin(p) {
                 Ok(s) => self.skin = s,
                 Err(e) => {
@@ -818,6 +819,11 @@ impl Model {
         }
         self.skin_changed_at = now;
         self.reload_skin(&path);
+    }
+
+    /// The built-in skin with the colour set the user picked.
+    fn builtin_skin(&self) -> Skin {
+        Skin::builtin_vector(Some(&self.settings().skin_colors))
     }
 
     /// Loads the skin with the colour set the user picked.
@@ -1452,8 +1458,12 @@ impl Model {
             MenuAction::SkinColors(set) => {
                 self.settings_mut().skin_colors = set;
                 // The pictures are read with their colours, so read them again.
-                if let Some(path) = self.skin_path.clone() {
-                    self.reload_skin(&path);
+                match self.skin_path.clone() {
+                    Some(path) => self.reload_skin(&path),
+                    None => {
+                        self.skin = self.builtin_skin();
+                        self.ui.push(UiReq::SkinChanged);
+                    }
                 }
             }
             MenuAction::MainAsBar(bar) => {
@@ -1987,10 +1997,22 @@ mod tests {
     }
 
     #[test]
+    fn the_built_in_skin_offers_its_colour_sets() {
+        let mut m = Model::for_tests();
+        let colours = |m: &Model| m.main_menu().into_iter().find(|i| i.label == "Colours").unwrap().sub;
+        let sets = colours(&m);
+        assert!(sets[0].checked);
+        let before = m.skin.sheet(popamp_skin::Sheet::Main).px.clone();
+        m.on_menu(sets[1].action.clone().unwrap());
+        assert!(colours(&m)[1].checked);
+        assert_ne!(m.skin.sheet(popamp_skin::Sheet::Main).px, before, "the pictures in the other set");
+        assert!(matches!(m.ui.last(), Some(UiReq::SkinChanged)));
+    }
+
+    #[test]
     fn a_skin_with_colour_sets_offers_them_and_remembers_the_pick() {
         let mut m = Model::for_tests();
         let colours = |m: &Model| m.main_menu().into_iter().find(|i| i.label == "Colours");
-        assert!(colours(&m).is_none(), "the default skin has one look");
         let dir = m.paths.skins_dir().join("tinted");
         std::fs::create_dir_all(&dir).unwrap();
         let toml = "[meta]\nname = \"Tinted\"\nformat_version = 1\n[colors.day]\nback = \"#ffffff\"\n\
@@ -2062,6 +2084,7 @@ mod tests {
     #[test]
     fn a_bar_skin_offers_the_edge_in_the_main_menu() {
         let mut m = Model::for_tests();
+        m.skin.layout.windows[0].bar = None; // the built-in skin has a bar view
         assert!(m.main_menu().iter().all(|i| i.label != "Toolbar mode"), "no bar, no choice");
         m.skin.layout.windows[0].placement = popamp_skin::layout::Placement::Bar(BarEdge::Bottom);
         assert!(toolbar(&m, "On").is_none() && toolbar(&m, "Size").is_some(), "a bar it is, with a size");
@@ -2076,6 +2099,7 @@ mod tests {
     fn a_skin_with_both_lets_the_user_pick_window_or_bar() {
         use popamp_skin::layout::{Bar, Placement, View};
         let mut m = Model::for_tests();
+        m.skin.layout.windows[0].bar = None; // the built-in skin has one
         m.settings_mut().main_bar = true;
         assert!(toolbar(&m, "On").is_none(), "the skin has no bar view");
         assert_eq!(crate::bar::edge(&m), None, "and stays a window whatever the setting");
