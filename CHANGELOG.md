@@ -60,6 +60,9 @@ All notable changes to this project are documented here. The format follows
 - What a menu item changes shows at once in every window: an equalizer
   preset picked from the Presets menu moved the sliders only after the
   next click in that window.
+- The media library, equalizer and playlist windows can be moved while
+  the main window is a bar; a window moved off the bar stays where it
+  was put until the bar is turned off.
 
 ## [0.9.1] - 2026-11-13
 

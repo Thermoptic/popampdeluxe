@@ -118,6 +118,9 @@ pub struct App {
     /// The skin's cursors, made into window-system cursors.
     cursors: HashMap<CursorKind, CustomCursor>,
     drag: Option<Drag>,
+    /// Windows the user moved away from the bar while it is on, by `idx`:
+    /// they stay where they were put until the bar goes.
+    off_bar: [bool; 4],
     capture: Option<WindowKey>,
     mods: ModifiersState,
     last_click: Option<(WindowKey, Instant, (i32, i32))>,
@@ -160,6 +163,7 @@ impl App {
             tip: None,
             cursors: HashMap::new(),
             drag: None,
+            off_bar: [false; 4],
             capture: None,
             mods: ModifiersState::empty(),
             last_click: None,
@@ -386,6 +390,7 @@ impl App {
         }
         self.attach_docked();
         if left_bar {
+            self.off_bar = [false; 4];
             for k in [WindowKey::Eq, WindowKey::Playlist, WindowKey::Library] {
                 let pos = self.saved_pos(k);
                 if let Some(w) = self.win_mut(k) {
@@ -460,10 +465,13 @@ impl App {
             .collect();
         let new_pos: Vec<(i32, i32)> = match bar {
             Some((edge, screen)) => {
-                // The library stays where the user has it.
-                let library = self.win(WindowKey::Library).map_or_else(|| self.saved_pos(WindowKey::Library), |w| w.pos);
-                let by_bar = bar::places(edge, screen, [sizes[0], sizes[1], sizes[2]], self.wanted_visible(WindowKey::Playlist));
-                by_bar.into_iter().chain([library]).collect()
+                // The library, and a window the user moved off the bar,
+                // stays where the user has it.
+                let off_bar = |k: WindowKey| k == WindowKey::Library || self.off_bar[k.index()];
+                let pl_by_bar = self.wanted_visible(WindowKey::Playlist) && !off_bar(WindowKey::Playlist);
+                let by_bar = bar::places(edge, screen, [sizes[0], sizes[1], sizes[2]], pl_by_bar);
+                let user = |k: WindowKey| self.win(k).map_or_else(|| self.saved_pos(k), |w| w.pos);
+                WindowKey::ALL.iter().map(|&k| if off_bar(k) { user(k) } else { by_bar[k.index()] }).collect()
             }
             None => {
                 // Without a bar all windows have one scale: the equalizer's.
@@ -986,8 +994,10 @@ impl App {
     }
 
     fn begin_move(&mut self, k: WindowKey) {
-        // The bar and the windows against it stay where they are.
-        if bar::edge(&self.model).is_some() {
+        // The bar stays where it is; another window moves alone and
+        // leaves the bar.
+        let by_bar = bar::edge(&self.model).is_some();
+        if by_bar && k == WindowKey::Main {
             return;
         }
         // Under Wayland only the compositor moves a window, and the others
@@ -999,7 +1009,7 @@ impl App {
             return;
         }
         // A free window takes the windows docked to it along.
-        let group = if self.placement(k) == Placement::Free { self.docked_group(k) } else { vec![k] };
+        let group = if self.placement(k) == Placement::Free && !by_bar { self.docked_group(k) } else { vec![k] };
         let start = self.cursor_screen(k);
         let group: Vec<_> = group.into_iter().filter_map(|g| self.win(g).map(|w| (g, w.pos))).collect();
         log::debug!(target: "moves", "begin {k:?}: group {group:?}, cursor {start:?}, x1 is 100 px wide: {}", self.scale(k).px(100));
@@ -1147,11 +1157,18 @@ impl App {
     fn mouse_up(&mut self, el: &ActiveEventLoop, k: WindowKey) {
         if let Some(drag) = self.drag.take() {
             if let Drag::Move { group, .. } = drag {
-                for (g, _) in group {
+                let by_bar = bar::edge(&self.model).is_some();
+                let was_off = self.off_bar;
+                for (g, from) in group {
                     log::debug!(target: "moves", "end {g:?} at {:?}", self.win(g).map(|w| w.pos));
                     if let Some(p) = self.win(g).map(|w| w.pos) {
+                        self.off_bar[g.index()] |= by_bar && p != from;
                         self.store_pos(g, p);
                     }
+                }
+                // The equalizer takes the playlist's place by the bar.
+                if self.off_bar != was_off {
+                    self.apply_layout(WindowKey::Main);
                 }
             }
             return;
