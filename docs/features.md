@@ -121,7 +121,37 @@
     portal (KDE Plasma 6, GNOME 48, Hyprland), which asks the user once
     and lets them pick other keys. GNOME keeps Ctrl+Alt+Left/Right for its
     workspaces.
-  - Bar skins reserve their strip of the screen, like a taskbar.
+  - Toolbar mode: the main window as a bar along the screen's edge (see
+    below).
+
+## Toolbar mode
+
+The main window can be a bar along the top or bottom edge of the screen,
+the way jetAudio's bar does, on Linux as well as on Windows:
+
+- **One strip with the whole player:** the transport buttons, the
+  visualizer, the clock, the scrolling title, volume and the EQ, PL,
+  shuffle and repeat switches, across the full width of the screen.
+- **Room kept for it, like a taskbar.** On Linux (X11) Popamp reserves
+  the strip with `_NET_WM_STRUT_PARTIAL`, so maximized windows stop at the
+  bar instead of going under it, and it stays inside the panels the
+  desktop already has at that edge (GNOME's top bar, a KDE or Xfce
+  panel). On Windows it is an application bar, as the taskbar is.
+- **The other windows go along.** The playlist and the equalizer sit
+  against the bar at its right end. Drag one away and it stays where it
+  was put until the bar is turned off; the media library moves freely.
+- **Main menu > Toolbar mode:** *On* / *Off*, *Position* (top or bottom of
+  the screen) and *Size* (×1 to ×3, apart from the size of the other
+  windows). Position and size can be chosen before the bar is on.
+- **Skins:** a vector skin describes its bar beside its window
+  (`[window.bar]` in `skin.toml`, see [skin-format.md](skin-format.md)),
+  so one skin gives both, in all its colour sets. The built-in Default
+  and the Modern, Steel, Classified and D11 skins have one. Classic
+  `.wsz` skins have no bar.
+
+Not as a Wayland program: Wayland does not let a program place its
+windows or reserve part of the screen. Under Xwayland, the default where
+it runs, the bar works as on X11.
 
 ## Known limitations
 
