@@ -22,7 +22,7 @@ const FORMAT_VERSION: u32 = 1;
 /// the file leaves out come from the built-in skin.
 /// `colors` is the colour set wanted, by name.
 pub fn load(files: &HashMap<String, Vec<u8>>, colors: Option<&str>) -> Result<Skin, String> {
-    load_onto(Skin::builtin_vector(), files, colors)
+    load_onto(Skin::builtin_vector(None), files, colors)
 }
 
 /// Builds a skin over `base`, which gives what the file leaves out.
@@ -919,7 +919,7 @@ click = \"play\"
     fn sheets_replace_classic_bitmaps() {
         let s = skin(&format!("{HEAD}[sheets]\nmain = \"play.svg\"\n[shapes]\nmain_shade = \"play.svg\"\n")).unwrap();
         assert!(s.vector);
-        let builtin = Skin::builtin_vector();
+        let builtin = Skin::builtin_vector(None);
         assert_ne!(s.sheet_svgs[&Sheet::Main], builtin.sheet_svgs[&Sheet::Main]);
         assert_eq!(s.sheet_svgs.len(), builtin.sheet_svgs.len(), "sheets left out are the built-in skin's drawings");
         assert_eq!((s.sheet(Sheet::Main).w, s.sheet(Sheet::Main).px[0]), (23, 0x00ff00), "an x1 copy for pixel reads");
