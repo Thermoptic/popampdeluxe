@@ -66,7 +66,14 @@ impl Skin {
     /// The built-in skin as x1 bitmaps, for classic skins to fall back on.
     /// A classic skin has one look: the built-in skin's colour sets are not its.
     pub fn builtin() -> Skin {
-        Skin { vector: false, svgs: svg::Svgs::default(), sheet_svgs: HashMap::new(), color_sets: Vec::new(), color_set: 0, ..Skin::builtin_vector(None) }
+        Skin {
+            vector: false,
+            svgs: svg::Svgs::default(),
+            sheet_svgs: HashMap::new(),
+            color_sets: Vec::new(),
+            color_set: 0,
+            ..Skin::builtin_vector(None)
+        }
     }
 
     /// A skin with nothing in it, to load the built-in one onto.
