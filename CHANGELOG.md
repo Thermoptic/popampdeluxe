@@ -6,8 +6,24 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-14
+
 ### Added
 
+- **A window and a bar in one skin:** a skin can describe its main
+  window both as a window and as a bar along a screen edge
+  (`[window.bar]` beside `[window.normal]`; a skin on classic sheets can
+  add just the bar). The main menu then offers *Main window as: A window
+  / A bar*. The clock takes `font_size`, so the bar can show a smaller
+  one.
+- **Colour sets:** a skin can name its colours in `[colors.<set>]` and
+  give several sets, so one skin has many looks. SVG shapes take a
+  colour by class, and the same names work in `[text]`, `[clock]`,
+  `[playlist]` and `[vis]`. The main menu offers *Colours* when a skin
+  has more than one set, and the pick is remembered.
+- **macOS:** sound plays through CoreAudio, on the default device or the
+  one picked, and the Mac's sound devices are listed by name (by
+  miraclebg).
 - **Wayland:** Popamp can run as a Wayland program, without Xwayland. It
   does so by itself on a Wayland desktop where X11 programs cannot run;
   elsewhere it stays an X11 program unless `wayland=1` is set in
@@ -46,6 +62,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The default skin is redrawn from one set of parts, with crisp
+  transport signs. It has a bar view as well as the window, and five
+  colour sets: Slate, Graphite, Plum, Pine and Wine.
 - Preferences is split into sections, listed down its left side:
   Windows, Playlist, Playback, Media Library, Desktop and Internet.
 - The main menu's *Bar position* and *Bar size* are now *Position* and
@@ -475,7 +494,8 @@ First release.
 - **Packaging:** desktop entry, `.wsz` MIME type, icons and a per-user
   install script.
 
-[Unreleased]: https://github.com/popamp/popamp/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/popamp/popamp/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/popamp/popamp/compare/v0.9.1...v1.0.0
 [0.9.1]: https://github.com/popamp/popamp/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/popamp/popamp/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/popamp/popamp/compare/v0.7.0...v0.8.0
