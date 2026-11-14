@@ -3006,7 +3006,7 @@ dependencies = [
 
 [[package]]
 name = "popamp"
-version = "0.9.1"
+version = "1.0.0"
 dependencies = [
  "crossbeam-channel",
  "env_logger",
@@ -3042,7 +3042,7 @@ dependencies = [
 
 [[package]]
 name = "popamp-audio"
-version = "0.9.1"
+version = "1.0.0"
 dependencies = [
  "crossbeam-channel",
  "ebur128",
@@ -3066,7 +3066,7 @@ dependencies = [
 
 [[package]]
 name = "popamp-core"
-version = "0.9.1"
+version = "1.0.0"
 dependencies = [
  "fastrand",
  "log",
@@ -3082,7 +3082,7 @@ dependencies = [
 
 [[package]]
 name = "popamp-plugins"
-version = "0.9.1"
+version = "1.0.0"
 dependencies = [
  "extism",
  "log",
@@ -3097,7 +3097,7 @@ dependencies = [
 
 [[package]]
 name = "popamp-skin"
-version = "0.9.1"
+version = "1.0.0"
 dependencies = [
  "fontdue",
  "image",
@@ -3113,7 +3113,7 @@ dependencies = [
 [[package]]
 name = "popamp-skin-default"
 version = "1.0.0"
-source = "git+https://github.com/popamp/popamp-skin-default?branch=main#6cfbbba13e4be6f634ab9b63e9fcb187c8984967"
+source = "git+https://github.com/popamp/popamp-skin-default?branch=main#cb8cfed8637f17ff1f8ee051091abab56ef09b59"
 
 [[package]]
 name = "popamp-visual"
