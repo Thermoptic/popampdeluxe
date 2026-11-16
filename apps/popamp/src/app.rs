@@ -131,6 +131,9 @@ pub struct App {
     last_slow: Instant,
     start_minimized: bool,
     popup_focus_check: Option<Instant>,
+    /// The companions hidden while the main window is minimized, where
+    /// they do not go to the Dock with it (macOS).
+    hidden_with_main: Vec<WindowKey>,
     /// `POPAMP_SNAPSHOT=<dir>`: write each window as PNG after a few frames and exit.
     snapshot: Option<(std::path::PathBuf, u32)>,
     platform: Platform,
@@ -174,6 +177,7 @@ impl App {
             last_slow: Instant::now(),
             start_minimized,
             popup_focus_check: None,
+            hidden_with_main: Vec::new(),
             snapshot: std::env::var_os("POPAMP_SNAPSHOT").map(|d| (std::path::PathBuf::from(d), 0)),
             platform: Platform::connect(),
             media,
@@ -233,10 +237,14 @@ impl App {
         }
     }
 
+    /// The screens, in the desktop's units, with their pixels per unit.
+    fn screens(&self) -> Vec<(Screen, f64)> {
+        let Some(top) = self.win(WindowKey::Main).and_then(|w| w.window.top()) else { return Vec::new() };
+        top.available_monitors().map(|m| (platform::monitor(&m), m.scale_factor())).collect()
+    }
+
     fn monitors(el: &ActiveEventLoop) -> Vec<Screen> {
-        el.available_monitors()
-            .map(|m| Screen { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 })
-            .collect()
+        el.available_monitors().map(|m| platform::monitor(&m)).collect()
     }
 
     /// The monitor with the main window's top-left corner, else the first.
@@ -295,8 +303,8 @@ impl App {
         let role = self.role(k);
         let mut attrs = platform::attributes(role)
             .with_title(crate::bind::title(k))
-            .with_inner_size(PhysicalSize::new(scale.px(w) as u32, scale.px(h) as u32))
-            .with_position(PhysicalPosition::new(pos.0, pos.1))
+            .with_inner_size(platform::size(scale.px(w), scale.px(h)))
+            .with_position(platform::position(pos.0, pos.1))
             .with_visible(false)
             .with_window_icon(window_icon());
         if self.model.settings().aot {
@@ -342,7 +350,26 @@ impl App {
     /// Minimizes or restores the windows. Where the system does that with
     /// the main window for the windows tied to it, only the main window:
     /// a minimized owned window would stay behind as a stub on the desktop.
-    fn set_minimized(&self, on: bool) {
+    fn set_minimized(&mut self, on: bool) {
+        let main = self.win(WindowKey::Main).filter(|w| w.role == WindowRole::Main).and_then(|w| w.window.top().cloned());
+        if let (true, Some(main)) = (platform::MINIMIZE_HIDES_COMPANIONS, main) {
+            // One Dock tile: the main window goes there, its companions hide.
+            main.set_minimized(on);
+            if on {
+                for k in WindowKey::ALL.into_iter().filter(|&k| k != WindowKey::Main) {
+                    if let Some(w) = self.win_mut(k).filter(|w| w.visible) {
+                        if let Some(top) = w.window.top() {
+                            top.set_visible(false);
+                        }
+                        w.visible = false;
+                        self.hidden_with_main.push(k);
+                    }
+                }
+            } else {
+                self.show_hidden_companions();
+            }
+            return;
+        }
         let owned = platform::OWNED_FOLLOW_OWNER && self.win(WindowKey::Main).is_some_and(|w| w.role == WindowRole::Main);
         for k in WindowKey::ALL {
             if owned && k != WindowKey::Main {
@@ -350,6 +377,19 @@ impl App {
             }
             if let Some(w) = self.win(k).filter(|w| w.visible).and_then(|w| w.window.top()) {
                 w.set_minimized(on);
+            }
+        }
+    }
+
+    /// Shows again the companions hidden when the main window was minimized.
+    fn show_hidden_companions(&mut self) {
+        for k in std::mem::take(&mut self.hidden_with_main) {
+            let wanted = self.wanted_visible(k);
+            if let Some(w) = self.win_mut(k).filter(|_| wanted) {
+                if let Some(top) = w.window.top() {
+                    top.set_visible(true);
+                }
+                w.visible = true;
             }
         }
     }
@@ -426,7 +466,7 @@ impl App {
             if let Some(w) = self.win_mut(k) {
                 let size = (scale.px(lw), scale.px(lh));
                 if let Some(top) = w.window.top() {
-                    let _ = top.request_inner_size(PhysicalSize::new(size.0 as u32, size.1 as u32));
+                    let _ = top.request_inner_size(platform::size(size.0, size.1));
                 }
                 if w.pos != pos {
                     w.window.move_to(pos);
@@ -496,10 +536,7 @@ impl App {
         let (Some(old), Some(w)) = (old, self.win(WindowKey::Playlist)) else { return false };
         let Some(def) = self.model.skin.layout.window(WindowKey::Playlist) else { return false };
         let Some(top) = w.window.top() else { return false };
-        let monitors: Vec<Screen> = top
-            .available_monitors()
-            .map(|m| Screen { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 })
-            .collect();
+        let monitors: Vec<Screen> = top.available_monitors().map(|m| platform::monitor(&m)).collect();
         let Some(monitor) = monitors.into_iter().find(|m| pos.0 >= m.x && pos.0 < m.x + m.w && pos.1 >= m.y && pos.1 < m.y + m.h) else {
             return false;
         };
@@ -555,12 +592,15 @@ impl App {
     }
 
     fn render(&mut self, k: WindowKey) {
-        let scale = self.scale(k);
         let i = k.index();
+        let layout = self.scale(k);
         let Some(w) = self.wins[i].as_mut() else { return };
         if !w.visible {
             return;
         }
+        // In screen pixels: the window's size in the desktop's units at its
+        // screen's pixels per unit (2 on a Retina Mac, else 1).
+        let scale = layout.on_screen(if platform::DESKTOP_IN_POINTS { w.window.scale_factor() } else { 1.0 });
         let (lw, lh) = w.size;
         // Vector skins are drawn at screen size, classic ones at x1 and scaled.
         let drawn = if self.model.skin.vector { scale } else { Scale::ONE };
@@ -570,9 +610,10 @@ impl App {
         }
         let active = w.focused;
         self.skins[k.index()].draw(&self.model, &mut self.fonts, &mut Canvas::new(&mut w.frame, drawn), active);
-        let (pw, ph) = (scale.px(lw), scale.px(lh));
+        let factor = if platform::DESKTOP_IN_POINTS { w.window.scale_factor() } else { 1.0 };
+        let (pw, ph) = surface_size(layout, (lw, lh), factor);
         let frame = &w.frame;
-        w.surface.present((pw, ph), |buf| scale.present(frame, buf, pw as usize, ph as usize));
+        w.surface.present((pw as i32, ph as i32), |buf| scale.present(frame, buf, pw as usize, ph as usize));
     }
 
     fn redraw_all(&mut self) {
@@ -595,19 +636,19 @@ impl App {
         if items.is_empty() {
             return;
         }
-        let pct = self.dialog_pct();
+        // Drawn at the density of the screen it opens on, placed within it.
+        let screens = self.screens();
+        let pct = if platform::DESKTOP_IN_POINTS { pct_on(&screens, at, self.dialog_pct()) } else { self.dialog_pct() };
         let layout = menu::layout(&items, &mut self.fonts.list, pct);
         let (w, h) = layout.screen();
-        let monitor = self.main_monitor().map(|m| Screen {
-            x: m.position().x,
-            y: m.position().y,
-            w: m.size().width as i32,
-            h: m.size().height as i32,
-        });
-        let (x, y) = monitor.map_or(at, |m| menu_origin(at, (w, h), m, !sub));
+        let main_monitor = self.main_monitor().map(|m| platform::monitor(&m));
+        let monitor = menu_screen(platform::DESKTOP_IN_POINTS, &screens, at, main_monitor);
+        // Placed in the desktop's units, as the cursor and the monitor are.
+        let units = (platform::from_drawn(w, pct), platform::from_drawn(h, pct));
+        let (x, y) = monitor.map_or(at, |m| menu_origin(at, units, m, !sub));
         let attrs = platform::attributes(WindowRole::Popup)
-            .with_inner_size(PhysicalSize::new(w as u32, h as u32))
-            .with_position(PhysicalPosition::new(x, y));
+            .with_inner_size(platform::drawn_size(w, h, pct))
+            .with_position(platform::position(x, y));
         let Some((window, surface)) = self.overlay(el, attrs, (x, y), true) else { return };
         let frame = Bitmap::new(w, h, 0);
         self.popups.push(Popup { window, surface, items, layout, hover: None, pos: (x, y), frame });
@@ -679,14 +720,13 @@ impl App {
         let pct = self.dialog_pct();
         let (w, h) = (crate::pen::screen(pct, panel.form().w), crate::pen::screen(pct, panel.form().h));
         // Centred on the main window's monitor, so the title bar is on screen.
-        let (cx, cy) = self
-            .main_monitor()
-            .map(|m| (m.position().x + m.size().width as i32 / 2, m.position().y + m.size().height as i32 / 2))
-            .unwrap_or((640, 400));
+        let monitor = self.main_monitor().map(|m| platform::monitor(&m));
+        let (cx, cy) = monitor.map_or((640, 400), |m| (m.x + m.w / 2, m.y + m.h / 2));
+        let (uw, uh) = (platform::from_drawn(w, pct), platform::from_drawn(h, pct));
         let attrs = platform::attributes(WindowRole::Dialog)
             .with_title(panel.title())
-            .with_inner_size(PhysicalSize::new(w as u32, h as u32))
-            .with_position(PhysicalPosition::new((cx - w / 2).max(0), (cy - h / 2).max(0)));
+            .with_inner_size(platform::drawn_size(w, h, pct))
+            .with_position(platform::position((cx - uw / 2).max(0), (cy - uh / 2).max(0)));
         let Ok(window) = el.create_window(attrs).map(Arc::new) else { return };
         let Ok(surface) = Surface::soft(&window) else { return };
         let frame = Bitmap::new(w, h, 0);
@@ -716,15 +756,17 @@ impl App {
     }
 
     fn render_panel(&mut self, i: usize) {
-        let pct = self.dialog_pct();
+        let main_pct = self.dialog_pct();
         let Some(p) = self.panels.get_mut(i) else { return };
+        // A dialog dragged to another screen is drawn at that screen's density.
+        let pct = if platform::DESKTOP_IN_POINTS { ((p.window.scale_factor() * 100.0).round() as i32).max(100) } else { main_pct };
         let form = p.panel.form();
         let (w, h) = (crate::pen::screen(pct, form.w), crate::pen::screen(pct, form.h));
         if (w, h) != (p.frame.w, p.frame.h) {
             // The windows changed size while the dialog was open.
             p.frame = Bitmap::new(w, h, 0);
             p.pct = pct;
-            let _ = p.window.request_inner_size(PhysicalSize::new(w as u32, h as u32));
+            let _ = p.window.request_inner_size(platform::drawn_size(w, h, pct));
         }
         form.draw(&mut Pen::new(&mut p.frame, &mut self.fonts.list, pct));
         present_unscaled(&mut p.surface, &p.frame);
@@ -736,7 +778,7 @@ impl App {
         let form = p.panel.form_mut();
         let out = match ev {
             WindowEvent::CloseRequested => Event::Cancel,
-            WindowEvent::RedrawRequested => Event::None,
+            WindowEvent::RedrawRequested | WindowEvent::ScaleFactorChanged { .. } => Event::None,
             WindowEvent::ModifiersChanged(m) => {
                 self.mods = m.state();
                 return;
@@ -872,8 +914,8 @@ impl App {
         let (x, y) = self.cursor_screen(WindowKey::Main);
         let attrs = platform::attributes(WindowRole::Tooltip)
             .with_title(text)
-            .with_inner_size(PhysicalSize::new(frame.w as u32, frame.h as u32))
-            .with_position(PhysicalPosition::new(x, y + 20))
+            .with_inner_size(platform::drawn_size(frame.w, frame.h, pct))
+            .with_position(platform::position(x, y + 20))
             .with_window_level(WindowLevel::AlwaysOnTop);
         let Some((window, surface)) = self.overlay(el, attrs, (x, y + 20), false) else { return };
         window.request_redraw();
@@ -901,7 +943,7 @@ impl App {
         p.hover = hover;
         let sub = hover.and_then(|h| {
             (!p.items[h].sub.is_empty()).then(|| {
-                let at = |n: i32| crate::pen::screen(p.layout.pct, n);
+                let at = |n: i32| platform::from_drawn(crate::pen::screen(p.layout.pct, n), p.layout.pct);
                 (p.items[h].sub.clone(), p.pos.0 + at(p.layout.w - 3), p.pos.1 + at(p.layout.rows[h].0 - 3))
             })
         });
@@ -1026,7 +1068,7 @@ impl App {
         let mut targets: Vec<(i32, i32, i32, i32)> =
             WindowKey::ALL.iter().filter(|&&k| !in_group(k)).filter_map(|&k| self.rect(k)).collect();
         if let Some(m) = self.main_monitor() {
-            let (mx, my, mw, mh) = (m.position().x, m.position().y, m.size().width as i32, m.size().height as i32);
+            let Screen { x: mx, y: my, w: mw, h: mh } = platform::monitor(&m);
             // Screen edges as zero-thickness rectangles around the monitor.
             targets.push((mx - 10_000, my - 10_000, 10_000 + mx + mw + 10_000 - mx, 10_000));
             targets.push((mx - 10_000, my + mh, 30_000, 10_000));
@@ -1860,9 +1902,27 @@ impl ApplicationHandler<AppEvent> for App {
                 }
                 self.set_key_focus(self.key_focus);
             }
+            // Moved to a screen with other pixels per point: the window keeps
+            // its size in points and is drawn again at the new density.
+            WindowEvent::ScaleFactorChanged { .. } if platform::DESKTOP_IN_POINTS => self.render(k),
             WindowEvent::Focused(f) => {
                 if let Some(w) = self.win_mut(k) {
                     w.focused = f;
+                }
+                if f && k == WindowKey::Main {
+                    // Back from the Dock: so are the companions.
+                    self.show_hidden_companions();
+                }
+                if f && cfg!(target_os = "macos") {
+                    // Clicked, the window comes up alone on macOS; its
+                    // companions come up with it, under it. A minimized one
+                    // stays in the Dock: bringing it up would restore it.
+                    let order = raise_order(k, |o| {
+                        self.win(o).is_some_and(|w| w.visible && w.window.top().and_then(|t| t.is_minimized()) != Some(true))
+                    });
+                    let windows: Vec<&Window> =
+                        order.iter().filter_map(|&o| self.win(o)).filter_map(|w| w.window.top()).map(|t| &**t).collect();
+                    self.platform.raise_together(&windows);
                 }
                 if !f && !self.popups.is_empty() {
                     self.popup_focus_check = Some(Instant::now());
@@ -1873,6 +1933,11 @@ impl ApplicationHandler<AppEvent> for App {
                 self.render(k);
             }
             WindowEvent::Moved(p) => {
+                let factor = self.win(k).map_or(1.0, |w| w.window.scale_factor());
+                let p = {
+                    let (x, y) = platform::from_screen(p.x as f64, p.y as f64, factor);
+                    PhysicalPosition::new(x, y)
+                };
                 // Windows moves a window out of a work area that shrank,
                 // the bar out of the strip just reserved for it: it goes back.
                 if let Some(w) = self.win(k).filter(|w| w.role == WindowRole::Bar && w.strip.is_some() && w.pos != (p.x, p.y)) {
@@ -1892,7 +1957,7 @@ impl ApplicationHandler<AppEvent> for App {
             WindowEvent::ModifiersChanged(m) => self.mods = m.state(),
             WindowEvent::CursorMoved { position, .. } => {
                 if let Some(w) = self.win_mut(k) {
-                    w.cursor = (position.x as i32, position.y as i32);
+                    w.cursor = platform::from_screen(position.x, position.y, w.window.scale_factor());
                 }
                 self.mouse_moved(k);
             }
@@ -1962,6 +2027,43 @@ fn shape_mask(model: &Model, mode: &Mode, shape: &Shape, size: (i32, i32), scale
 /// Screen rectangle of a shown window: x, y, width, height.
 type Rect = (i32, i32, i32, i32);
 
+/// The screen a menu opened at `at` is kept on: the one under it where the
+/// desktop counts in points (screens of other densities side by side on a
+/// Mac), else the main window's, as Popamp does elsewhere (under Wayland
+/// none: a window there does not know where it is).
+fn menu_screen(points: bool, screens: &[(Screen, f64)], at: (i32, i32), main: Option<Screen>) -> Option<Screen> {
+    if !points {
+        return main;
+    }
+    screens.iter().map(|&(s, _)| s).find(|s| contains(*s, at)).or(main)
+}
+
+/// Whether `at` is on `screen`.
+fn contains(screen: Screen, at: (i32, i32)) -> bool {
+    at.0 >= screen.x && at.0 < screen.x + screen.w && at.1 >= screen.y && at.1 < screen.y + screen.h
+}
+
+/// The drawing percent on the screen holding `at`, from each screen's
+/// pixels per desktop unit; `fallback` off every screen.
+fn pct_on(screens: &[(Screen, f64)], at: (i32, i32), fallback: i32) -> i32 {
+    screens.iter().find(|(s, _)| contains(*s, at)).map_or(fallback, |&(_, f)| ((f * 100.0).round() as i32).max(100))
+}
+
+/// The pixels of a window `size` skin pixels big at `layout` in the
+/// desktop's units, on a screen with `factor` pixels to each: the window's
+/// own size, rounded once, so the drawing reaches every edge.
+fn surface_size(layout: Scale, size: (i32, i32), factor: f64) -> (u32, u32) {
+    let px = |n: i32| ((layout.px(n) as f64) * factor).round().max(1.0) as u32;
+    (px(size.0), px(size.1))
+}
+
+/// The windows to bring up when `focused` is clicked, back to front: the
+/// other visible ones, then `focused` itself on top.
+fn raise_order(focused: WindowKey, visible: impl Fn(WindowKey) -> bool) -> Vec<WindowKey> {
+    let others = WindowKey::ALL.into_iter().filter(|&k| k != focused && visible(k));
+    others.chain([focused]).collect()
+}
+
 /// New positions after windows change size. `anchor`, then the first shown
 /// window of every other docked group, stays put; a window docked to a placed
 /// one goes back against the same edge, its offset along that edge passed
@@ -2028,6 +2130,40 @@ fn reattach(a: Rect, b: Rect, now: Rect, size: (i32, i32), rescale: &impl Fn(i32
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_menu_is_drawn_at_the_density_of_the_screen_it_opens_on() {
+        let retina = (Screen { x: 0, y: 0, w: 1728, h: 1117 }, 2.0);
+        let plain = (Screen { x: 1728, y: 0, w: 2560, h: 1440 }, 1.0);
+        assert_eq!(pct_on(&[retina, plain], (2000, 300), 150), 100);
+        assert_eq!(pct_on(&[retina, plain], (100, 300), 150), 200);
+        assert_eq!(pct_on(&[retina, plain], (-50, -50), 150), 150, "off every screen: the fallback");
+    }
+
+    #[test]
+    fn the_drawing_fills_the_window_to_the_last_pixel() {
+        // x1.5 on Retina: 275 skin pixels are 413 points, 826 pixels.
+        assert_eq!(surface_size(Scale::new(150, popamp_core::config::Scaling::Sharp), (275, 116), 2.0), (826, 348));
+        assert_eq!(surface_size(Scale::new(200, popamp_core::config::Scaling::Sharp), (275, 116), 1.0), (550, 232));
+    }
+
+    #[test]
+    fn a_menu_stays_on_the_screen_under_it_only_in_points() {
+        let left = Screen { x: 0, y: 0, w: 1512, h: 982 };
+        let right = Screen { x: 1512, y: 0, w: 2560, h: 1440 };
+        let screens = [(left, 2.0), (right, 1.0)];
+        assert_eq!(menu_screen(true, &screens, (2000, 50), Some(left)), Some(right));
+        assert_eq!(menu_screen(true, &screens, (-50, 50), Some(left)), Some(left), "off every screen: the main one");
+        assert_eq!(menu_screen(false, &screens, (2000, 50), Some(left)), Some(left), "elsewhere: the main window's");
+        assert_eq!(menu_screen(false, &screens, (2000, 50), None), None, "Wayland: none");
+    }
+
+    #[test]
+    fn the_window_clicked_comes_up_last_with_its_visible_companions_under_it() {
+        let shown = |k: WindowKey| k != WindowKey::Eq;
+        assert_eq!(raise_order(WindowKey::Main, shown), [WindowKey::Playlist, WindowKey::Library, WindowKey::Main]);
+        assert_eq!(raise_order(WindowKey::Playlist, |_| true), [WindowKey::Main, WindowKey::Eq, WindowKey::Library, WindowKey::Playlist]);
+    }
 
     fn x15(d: i32) -> i32 {
         d * 3 / 2
