@@ -6,7 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-16
+
+### Fixed
+
+- **Dragging under X11:** a window and the windows docked to it follow
+  the mouse again. With window managers that report moves late, such as
+  Xfce's, they fell behind the mouse, jumped back, and could end up far
+  off the screen ([#46](https://github.com/popamp/popamp/issues/46)).
+- **Raising under X11:** a click on one of Popamp's windows brings up
+  the others with it, so another program's window no longer cuts the
+  docked group in two.
+- **Dialogs on Linux:** when neither zenity nor kdialog is installed,
+  the main window says *DIALOGS NEED ZENITY* instead of doing nothing;
+  when the dialog program fails, it says *DIALOG FAILED, SEE THE LOG*
+  and the log has the reason.
+
 ### Changed
+
+- **macOS:** the code takes the Mac's own dialogs, fonts and Finder's
+  "Open with", and draws sharp on Retina screens. There is still no
+  macOS download from this project.
 
 - **AppImage:** it carries the libraries a desktop may lack (xkbcommon,
   Xcursor, Xi, Opus, libopenmpt and what they need), so it starts on
@@ -501,7 +521,8 @@ First release.
 - **Packaging:** desktop entry, `.wsz` MIME type, icons and a per-user
   install script.
 
-[Unreleased]: https://github.com/popamp/popamp/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/popamp/popamp/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/popamp/popamp/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/popamp/popamp/compare/v0.9.1...v1.0.0
 [0.9.1]: https://github.com/popamp/popamp/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/popamp/popamp/compare/v0.8.0...v0.9.0
