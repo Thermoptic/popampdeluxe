@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **AppImage:** it carries the libraries a desktop may lack (xkbcommon,
+  Xcursor, Xi, Opus, libopenmpt and what they need), so it starts on
+  systems without them; before, it quit at once where xkbcommon-x11 was
+  missing. Its file name drops `linux`: `Popamp-<version>-x86_64.AppImage`.
+
 ## [1.0.0] - 2026-11-14
 
 ### Added
