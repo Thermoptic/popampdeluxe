@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Dragging at a screen edge under X11:** docked windows stay together
+  when the group reaches an edge. The window manager holds each window
+  inside the work area, so the windows further from the edge went on
+  and slid over the held one, and the next drag started with the held
+  window stuck at the edge. The group now stops as a whole.
+
+### Changed
+
+- **Software centres:** the AppStream data has screenshots and a
+  current description, so the AppImage catalog and the software centres
+  show the player with its skins instead of an empty playlist.
+
 ## [1.0.1] - 2026-11-16
 
 ### Fixed
