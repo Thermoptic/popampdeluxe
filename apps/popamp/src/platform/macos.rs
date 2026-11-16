@@ -59,6 +59,11 @@ impl Platform {
     /// Nothing to give back.
     pub fn release(&self, _window: &Window) {}
 
+    /// None: the window's own mouse position serves.
+    pub fn pointer(&self) -> Option<(i32, i32)> {
+        None
+    }
+
     /// Brings `windows` above other programs' windows, back to front,
     /// without making any of them the key window: macOS brings up only the
     /// window clicked, not its companions.

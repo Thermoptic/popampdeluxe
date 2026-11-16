@@ -14,7 +14,7 @@ use winit::platform::x11::{WindowAttributesExtX11, WindowType};
 use winit::window::{Window, WindowAttributes};
 use x11rb::connection::{Connection, RequestConnection};
 use x11rb::protocol::shape::{self, ConnectionExt as _, SK, SO};
-use x11rb::protocol::xproto::{AtomEnum, ClipOrdering, ConnectionExt as _, PropMode, Rectangle};
+use x11rb::protocol::xproto::{AtomEnum, ClipOrdering, ConfigureWindowAux, ConnectionExt as _, PropMode, Rectangle, StackMode};
 use x11rb::rust_connection::RustConnection;
 use x11rb::wrapper::ConnectionExt as _;
 
@@ -153,9 +153,9 @@ impl Platform {
     }
 
     /// Makes `window` a companion of `owner` (`WM_TRANSIENT_FOR`): the
-    /// window manager then keeps it above the owner and brings it up and
-    /// minimizes it together with the owner, as when the owner's taskbar
-    /// icon is clicked. `None` makes it a window of its own again.
+    /// window manager then keeps it with the owner, as when the owner's
+    /// taskbar icon is clicked (see `raise_together` for a click on the
+    /// owner). `None` makes it a window of its own again.
     pub fn attach(&self, window: &Window, owner: Option<&Window>) -> Result<(), String> {
         let (Some(conn), Some(xid)) = (&self.x11, x11_window_id(window)) else { return Ok(()) };
         let err = |e: &dyn std::fmt::Display| e.to_string();
@@ -171,8 +171,35 @@ impl Platform {
     /// which the window manager never focuses.
     pub fn no_activate(&self, _window: &Window) {}
 
-    /// Nothing to do: owned windows come up with their owner.
-    pub fn raise_together(&self, _windows: &[&Window]) {}
+    /// Brings `windows` up, back to front. Not every window manager brings
+    /// a window's companions up with it: xfwm4 raises only the one clicked,
+    /// and another program's window then cuts the docked group in two.
+    /// The top one, just clicked, the window manager has brought up; the
+    /// others go right under it. Raised outright they would take the focus
+    /// from it, as xfwm4 focuses a window a program brings up.
+    pub fn raise_together(&self, windows: &[&Window]) {
+        let Some(conn) = &self.x11 else { return };
+        let xids: Vec<u32> = windows.iter().filter_map(|w| x11_window_id(w)).collect();
+        let Some((&top, under)) = xids.split_last() else { return };
+        let below_top = ConfigureWindowAux::new().sibling(top).stack_mode(StackMode::BELOW);
+        for &xid in under {
+            if let Err(e) = conn.configure_window(xid, &below_top) {
+                log::debug!("raise: {e}");
+            }
+        }
+        let _ = conn.flush();
+    }
+
+    /// Where the mouse is on the X screen. A window's own mouse position
+    /// is from where the window was when the event was sent; the window
+    /// manager moves a dragged window later than asked, so that adds up
+    /// to a point off the mouse.
+    pub fn pointer(&self) -> Option<(i32, i32)> {
+        let conn = self.x11.as_ref()?;
+        let root = conn.setup().roots.first()?.root;
+        let reply = conn.query_pointer(root).ok()?.reply().ok()?;
+        Some((reply.root_x.into(), reply.root_y.into()))
+    }
 
     /// Nothing to give back: a strut goes with its window.
     pub fn release(&self, _window: &Window) {}

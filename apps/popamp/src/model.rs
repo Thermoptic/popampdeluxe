@@ -47,6 +47,8 @@ pub enum AppEvent {
         mode: AddMode,
     },
     Dialog(DialogResult),
+    /// No dialog came up, and why.
+    DialogFailed(crate::dialogs::DialogError),
     Remote(crate::ipc::Request),
     Museum(crate::museum::Fetched),
     Gallery(crate::gallery::Fetched),

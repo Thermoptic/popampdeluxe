@@ -26,7 +26,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use winit::application::ApplicationHandler;
 use winit::dpi::{PhysicalPosition, PhysicalSize};
-use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, StartCause, WindowEvent};
+use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, MouseButton, MouseScrollDelta, StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::keyboard::{Key, KeyCode, ModifiersState, NamedKey, PhysicalKey};
 use winit::window::{CursorIcon, CustomCursor, Window, WindowId, WindowLevel};
@@ -100,8 +100,16 @@ struct PanelWindow {
 }
 
 enum Drag {
-    Move { group: Vec<(WindowKey, (i32, i32))>, start: (i32, i32) },
-    Resize { start_size: (i32, i32), start: (i32, i32) },
+    /// `held` is the window the mouse holds.
+    Move {
+        held: WindowKey,
+        group: Vec<(WindowKey, (i32, i32))>,
+        start: (i32, i32),
+    },
+    Resize {
+        start_size: (i32, i32),
+        start: (i32, i32),
+    },
 }
 
 pub struct App {
@@ -628,6 +636,9 @@ impl App {
     // --- pop-up menus ---------------------------------------------------------
 
     fn cursor_screen(&self, k: WindowKey) -> (i32, i32) {
+        if let Some(at) = self.platform.pointer() {
+            return at;
+        }
         self.win(k).map(|w| (w.pos.0 + w.cursor.0, w.pos.1 + w.cursor.1)).unwrap_or((100, 100))
     }
 
@@ -1035,6 +1046,17 @@ impl App {
         group
     }
 
+    /// Brings `k` up with the other shown windows under it: the window
+    /// manager brings up only the window clicked, and another program's
+    /// window would then cut the docked group in two. A minimized one stays
+    /// minimized: bringing it up would restore it.
+    fn raise_with_companions(&self, k: WindowKey) {
+        let order =
+            raise_order(k, |o| self.win(o).is_some_and(|w| w.visible && w.window.top().and_then(|t| t.is_minimized()) != Some(true)));
+        let windows: Vec<&Window> = order.iter().filter_map(|&o| self.win(o)).filter_map(|w| w.window.top()).map(|t| &**t).collect();
+        self.platform.raise_together(&windows);
+    }
+
     fn begin_move(&mut self, k: WindowKey) {
         // The bar stays where it is; another window moves alone and
         // leaves the bar.
@@ -1055,7 +1077,7 @@ impl App {
         let start = self.cursor_screen(k);
         let group: Vec<_> = group.into_iter().filter_map(|g| self.win(g).map(|w| (g, w.pos))).collect();
         log::debug!(target: "moves", "begin {k:?}: group {group:?}, cursor {start:?}, x1 is 100 px wide: {}", self.scale(k).px(100));
-        self.drag = Some(Drag::Move { group, start });
+        self.drag = Some(Drag::Move { held: k, group, start });
     }
 
     fn snap_delta(&self, group: &[(WindowKey, (i32, i32))], dx: i32, dy: i32) -> (i32, i32) {
@@ -1108,7 +1130,7 @@ impl App {
     fn drag_to(&mut self, k: WindowKey) {
         let cursor = self.cursor_screen(k);
         match &self.drag {
-            Some(Drag::Move { group, start }) => {
+            Some(Drag::Move { group, start, .. }) => {
                 let (dx, dy) = (cursor.0 - start.0, cursor.1 - start.1);
                 let group = group.clone();
                 let (sx, sy) = self.snap_delta(&group, dx, dy);
@@ -1183,6 +1205,8 @@ impl App {
         }
         if self.platform.on_wayland() {
             self.set_key_focus(k);
+        } else if !cfg!(target_os = "macos") {
+            self.raise_with_companions(k);
         }
         let right = button == MouseButton::Right;
         let pos = self.win(k).map(|w| w.cursor).unwrap_or_default();
@@ -1567,7 +1591,10 @@ impl App {
                 UiReq::Dialog(kind, req) => {
                     let events = self.model.events().clone();
                     let _ = std::thread::Builder::new().name("popamp-dialog".into()).spawn(move || {
-                        let values = dialogs::execute(&req);
+                        let values = dialogs::show(&req).unwrap_or_else(|why| {
+                            events.send(AppEvent::DialogFailed(why));
+                            Vec::new()
+                        });
                         events.send(AppEvent::Dialog(DialogResult { kind, values }));
                     });
                 }
@@ -1781,6 +1808,16 @@ impl ApplicationHandler<AppEvent> for App {
         self.pump_children(el);
     }
 
+    /// Under X11 a window being dragged follows the mouse itself, not the
+    /// window's mouse events: winit drops one where the mouse has kept its
+    /// place in the window, as it does when the window has just caught up
+    /// with it, and the window would stay a step behind.
+    fn device_event(&mut self, _el: &ActiveEventLoop, _id: DeviceId, ev: DeviceEvent) {
+        if let (true, DeviceEvent::MouseMotion { .. }, Some(&Drag::Move { held, .. })) = (cfg!(linux_like), ev, self.drag.as_ref()) {
+            self.drag_to(held);
+        }
+    }
+
     fn resumed(&mut self, el: &ActiveEventLoop) {
         if self.wins[0].is_none() {
             self.create_windows(el);
@@ -1816,6 +1853,10 @@ impl ApplicationHandler<AppEvent> for App {
                 }
             }
             AppEvent::Dialog(r) => self.model.on_dialog(r),
+            AppEvent::DialogFailed(why) => {
+                log::warn!("no dialog: {why}");
+                self.model.flash(why.short());
+            }
             #[cfg(feature = "plugins")]
             AppEvent::Plugins(n, list, effects) => self.model.on_plugins(n, list, effects),
             #[cfg(feature = "plugins")]
@@ -1913,16 +1954,11 @@ impl ApplicationHandler<AppEvent> for App {
                     // Back from the Dock: so are the companions.
                     self.show_hidden_companions();
                 }
+                // On macOS raising does not move the focus. X11 window
+                // managers may focus a window brought up, which would come
+                // back here for ever: there the click raises (`mouse_down`).
                 if f && cfg!(target_os = "macos") {
-                    // Clicked, the window comes up alone on macOS; its
-                    // companions come up with it, under it. A minimized one
-                    // stays in the Dock: bringing it up would restore it.
-                    let order = raise_order(k, |o| {
-                        self.win(o).is_some_and(|w| w.visible && w.window.top().and_then(|t| t.is_minimized()) != Some(true))
-                    });
-                    let windows: Vec<&Window> =
-                        order.iter().filter_map(|&o| self.win(o)).filter_map(|w| w.window.top()).map(|t| &**t).collect();
-                    self.platform.raise_together(&windows);
+                    self.raise_with_companions(k);
                 }
                 if !f && !self.popups.is_empty() {
                     self.popup_focus_check = Some(Instant::now());
