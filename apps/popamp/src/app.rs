@@ -1591,7 +1591,10 @@ impl App {
                 UiReq::Dialog(kind, req) => {
                     let events = self.model.events().clone();
                     let _ = std::thread::Builder::new().name("popamp-dialog".into()).spawn(move || {
-                        let values = dialogs::execute(&req);
+                        let values = dialogs::show(&req).unwrap_or_else(|why| {
+                            events.send(AppEvent::DialogFailed(why));
+                            Vec::new()
+                        });
                         events.send(AppEvent::Dialog(DialogResult { kind, values }));
                     });
                 }
@@ -1850,6 +1853,10 @@ impl ApplicationHandler<AppEvent> for App {
                 }
             }
             AppEvent::Dialog(r) => self.model.on_dialog(r),
+            AppEvent::DialogFailed(why) => {
+                log::warn!("no dialog: {why}");
+                self.model.flash(why.short());
+            }
             #[cfg(feature = "plugins")]
             AppEvent::Plugins(n, list, effects) => self.model.on_plugins(n, list, effects),
             #[cfg(feature = "plugins")]
