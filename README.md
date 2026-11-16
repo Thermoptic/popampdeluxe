@@ -1,3 +1,5 @@
+<h1 align="center">Popamp</h1>
+
 <p align="center">
   <a href="#install"><img src="assets/readme/hero.png" alt="Popamp with three of its skins: Default, Steel and Modern" width="100%"></a>
 </p>
@@ -92,7 +94,7 @@ with [plug-ins](docs/plugins.md) such as YouTube and visualizers.
 |---|---|
 | Debian, Ubuntu | add the [apt repository](docs/building.md#debian-and-ubuntu), then `sudo apt install popamp`; or download `popamp-<version>-linux-amd64.deb` (ARM64: `-arm64.deb`) and `sudo apt install ./popamp-…deb` |
 | openSUSE, Fedora | add the [repository](docs/building.md#opensuse-and-fedora), then `sudo zypper install popamp` or `sudo dnf install popamp` |
-| Any other Linux | `Popamp-<version>-linux-x86_64.AppImage`: `chmod +x` it and run it |
+| Any other Linux | `Popamp-<version>-x86_64.AppImage`: `chmod +x` it and run it |
 | Windows 10 or 11 | `Popamp-<version>-windows-x86_64-setup.exe`, or the portable `…-portable.zip`: unpack it anywhere and run `popamp.exe` |
 
 Or build it yourself with Rust 1.96 or newer:
