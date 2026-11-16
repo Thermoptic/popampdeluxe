@@ -105,6 +105,8 @@ enum Drag {
         held: WindowKey,
         group: Vec<(WindowKey, (i32, i32))>,
         start: (i32, i32),
+        /// How far the group goes, from [`reach`].
+        reach: Reach,
     },
     Resize {
         start_size: (i32, i32),
@@ -1075,9 +1077,18 @@ impl App {
         // A free window takes the windows docked to it along.
         let group = if self.placement(k) == Placement::Free && !by_bar { self.docked_group(k) } else { vec![k] };
         let start = self.cursor_screen(k);
+        // Windows lets a window past the work area's edges; X11 window
+        // managers hold it inside.
+        let reach = if cfg!(windows) {
+            Reach::FREE
+        } else {
+            let rects: Vec<Rect> = group.iter().filter_map(|&g| self.rect(g)).collect();
+            let monitors: Vec<Screen> = self.screens().into_iter().map(|(m, _)| m).collect();
+            reach(&rects, &monitors, &self.platform.work_areas())
+        };
         let group: Vec<_> = group.into_iter().filter_map(|g| self.win(g).map(|w| (g, w.pos))).collect();
-        log::debug!(target: "moves", "begin {k:?}: group {group:?}, cursor {start:?}, x1 is 100 px wide: {}", self.scale(k).px(100));
-        self.drag = Some(Drag::Move { held: k, group, start });
+        log::debug!(target: "moves", "begin {k:?}: group {group:?}, cursor {start:?}, reach {reach:?}, x1 is 100 px wide: {}", self.scale(k).px(100));
+        self.drag = Some(Drag::Move { held: k, group, start, reach });
     }
 
     fn snap_delta(&self, group: &[(WindowKey, (i32, i32))], dx: i32, dy: i32) -> (i32, i32) {
@@ -1130,10 +1141,11 @@ impl App {
     fn drag_to(&mut self, k: WindowKey) {
         let cursor = self.cursor_screen(k);
         match &self.drag {
-            Some(Drag::Move { group, start, .. }) => {
+            Some(Drag::Move { group, start, reach, .. }) => {
                 let (dx, dy) = (cursor.0 - start.0, cursor.1 - start.1);
-                let group = group.clone();
+                let (group, reach) = (group.clone(), *reach);
                 let (sx, sy) = self.snap_delta(&group, dx, dy);
+                let (sx, sy) = reach.clamp(sx, sy);
                 log::debug!(target: "moves", "drag {k:?}: cursor {cursor:?} (local {:?}), by ({dx},{dy}) snapped ({sx},{sy})", self.win(k).map(|w| w.cursor));
                 let (dx, dy) = (sx, sy);
                 for (g, origin) in group {
@@ -2100,6 +2112,63 @@ fn raise_order(focused: WindowKey, visible: impl Fn(WindowKey) -> bool) -> Vec<W
     others.chain([focused]).collect()
 }
 
+/// How far a group of windows may go from where a drag started: X11
+/// window managers hold each window inside the work area, and a group that
+/// went on would slide apart, the held windows staying behind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Reach {
+    /// The most negative and the most positive step on (x, y).
+    lo: (i32, i32),
+    hi: (i32, i32),
+}
+
+impl Reach {
+    const FREE: Reach = Reach { lo: (i32::MIN, i32::MIN), hi: (i32::MAX, i32::MAX) };
+
+    fn clamp(&self, dx: i32, dy: i32) -> (i32, i32) {
+        (dx.max(self.lo.0).min(self.hi.0), dy.max(self.lo.1).min(self.hi.1))
+    }
+}
+
+/// The [`Reach`] of a group from its windows' screen rectangles at the
+/// start. An edge holds a window that starts inside it, and only where no
+/// monitor lies beyond that edge.
+fn reach(group: &[Rect], monitors: &[Screen], work_areas: &[Screen]) -> Reach {
+    let mut r = Reach::FREE;
+    for &(x, y, w, h) in group {
+        let (cx, cy) = (x + w / 2, y + h / 2);
+        let Some(&m) = monitors.iter().find(|m| cx >= m.x && cx < m.x + m.w && cy >= m.y && cy < m.y + m.h) else { continue };
+        let a = bar::usable(m, work_areas, None);
+        let [left, right, up, down] = monitors_beside(monitors, m);
+        let (lx, hx) = edge_reach(x, w, a.x, a.w, (left, right));
+        let (ly, hy) = edge_reach(y, h, a.y, a.h, (up, down));
+        r.lo = (r.lo.0.max(lx), r.lo.1.max(ly));
+        r.hi = (r.hi.0.min(hx), r.hi.1.min(hy));
+    }
+    r
+}
+
+/// On one axis, how far a window at `pos`, `len` long, may go before and
+/// after inside an area from `from`, `size` long; free where a monitor lies
+/// beyond the area (`open`) or the window starts outside it.
+fn edge_reach(pos: i32, len: i32, from: i32, size: i32, open: (bool, bool)) -> (i32, i32) {
+    let lo = if pos >= from && !open.0 { from - pos } else { i32::MIN };
+    let hi = if pos + len <= from + size && !open.1 { from + size - (pos + len) } else { i32::MAX };
+    (lo, hi)
+}
+
+/// Whether another monitor lies left of, right of, above and below `m`.
+fn monitors_beside(monitors: &[Screen], m: Screen) -> [bool; 4] {
+    let rows = |o: &&Screen| o.y < m.y + m.h && m.y < o.y + o.h;
+    let columns = |o: &&Screen| o.x < m.x + m.w && m.x < o.x + o.w;
+    [
+        monitors.iter().filter(rows).any(|o| o.x + o.w <= m.x),
+        monitors.iter().filter(rows).any(|o| o.x >= m.x + m.w),
+        monitors.iter().filter(columns).any(|o| o.y + o.h <= m.y),
+        monitors.iter().filter(columns).any(|o| o.y >= m.y + m.h),
+    ]
+}
+
 /// New positions after windows change size. `anchor`, then the first shown
 /// window of every other docked group, stays put; a window docked to a placed
 /// one goes back against the same edge, its offset along that edge passed
@@ -2166,6 +2235,31 @@ fn reattach(a: Rect, b: Rect, now: Rect, size: (i32, i32), rescale: &impl Fn(i32
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const MONITOR: [Screen; 1] = [Screen { x: 0, y: 0, w: 1920, h: 1080 }];
+    const BELOW_PANEL: [Screen; 1] = [Screen { x: 0, y: 32, w: 1920, h: 1048 }];
+
+    #[test]
+    fn a_docked_group_stops_where_the_window_manager_holds_one_of_it() {
+        // Main against the panel and the right edge, the equalizer and the
+        // playlist under it, the playlist slid 53 px to the left.
+        let group = [(1645, 32, 275, 116), (1645, 148, 275, 116), (1592, 264, 275, 232)];
+        let r = reach(&group, &MONITOR, &BELOW_PANEL);
+        assert_eq!((r.lo, r.hi), ((-1592, 0), (0, 1080 - 496)));
+        assert_eq!(r.clamp(200, -100), (0, 0), "held at the right edge and the panel");
+        assert_eq!(r.clamp(-300, 50), (-300, 50), "free to go left and down");
+        assert_eq!(reach(&group, &MONITOR, &[]).lo.1, -32, "no work area: the monitor's top");
+    }
+
+    #[test]
+    fn a_group_goes_freely_to_a_monitor_beside_it_or_from_beyond_an_edge() {
+        let side_by_side = [Screen { x: 0, y: 0, w: 1920, h: 1080 }, Screen { x: 1920, y: 0, w: 1920, h: 1080 }];
+        let r = reach(&[(1645, 100, 275, 116)], &side_by_side, &side_by_side);
+        assert_eq!(r.hi.0, i32::MAX);
+        let stacked = [Screen { x: 0, y: 0, w: 1920, h: 1080 }, Screen { x: 0, y: 1080, w: 1920, h: 1080 }];
+        assert_eq!(reach(&[(100, 1200, 275, 116)], &stacked, &stacked).lo.1, i32::MIN);
+        assert_eq!(reach(&[(100, -50, 275, 116)], &MONITOR, &MONITOR).lo.1, i32::MIN, "already above: left alone");
+    }
 
     #[test]
     fn a_menu_is_drawn_at_the_density_of_the_screen_it_opens_on() {
