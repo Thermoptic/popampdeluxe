@@ -385,7 +385,24 @@ impl Paths {
                 return Self { config_dir: exe_dir.clone(), data_dir: exe_dir, share_dirs: Vec::new() };
             }
         }
-        Self::system()
+        let mut paths = Self::system();
+        if let Some(exe) = std::env::current_exe().ok() {
+            paths.add_program_dirs(&exe);
+        }
+        paths
+    }
+
+    /// Also reads what sits beside the program: its `skins` folder, where
+    /// anyone can drop skins, and, for a build run from a checkout's
+    /// `target`, the checkout's own.
+    fn add_program_dirs(&mut self, exe: &Path) {
+        let Some(dir) = exe.parent() else { return };
+        let checkout = dir.parent().filter(|t| t.file_name().is_some_and(|n| n == "target")).and_then(Path::parent);
+        for d in std::iter::once(dir).chain(checkout) {
+            if d != self.data_dir && !self.share_dirs.iter().any(|s| s == d) {
+                self.share_dirs.push(d.to_path_buf());
+            }
+        }
     }
 
     /// Everything in `%APPDATA%\popamp`, as Winamp keeps it.
@@ -393,9 +410,7 @@ impl Paths {
     fn system() -> Self {
         let home = std::env::home_dir().unwrap_or_else(|| PathBuf::from("."));
         let dir = std::env::var_os("APPDATA").map(PathBuf::from).unwrap_or_else(|| home.join("AppData").join("Roaming")).join("popamp");
-        // What the installer put next to popamp.exe (its `skins` folder).
-        let share_dirs = std::env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf)).into_iter().collect();
-        Self { config_dir: dir.clone(), data_dir: dir, share_dirs }
+        Self { config_dir: dir.clone(), data_dir: dir, share_dirs: Vec::new() }
     }
 
     /// `~/Library/Application Support/popamp`, and the app bundle's
@@ -603,6 +618,19 @@ mod tests {
         let support = PathBuf::from("/Users/u/Library/Application Support/popamp");
         assert_eq!((p.config_dir.clone(), p.data_dir.clone()), (support.clone(), support));
         assert!(p.share_dirs.is_empty());
+    }
+
+    #[test]
+    fn the_skins_folder_beside_the_program_is_read() {
+        let mut p = Paths { config_dir: "/c".into(), data_dir: "/d".into(), share_dirs: vec!["/usr/share/popamp".into()] };
+        p.add_program_dirs(Path::new("/opt/popamp/popamp"));
+        assert_eq!(p.skins_dirs().last(), Some(&PathBuf::from("/opt/popamp/skins")));
+        let mut q = Paths { config_dir: "/c".into(), data_dir: "/d".into(), share_dirs: vec![] };
+        q.add_program_dirs(Path::new("/src/popamp/target/debug/popamp"));
+        assert_eq!(q.skins_dirs(), [PathBuf::from("/d/skins"), "/src/popamp/target/debug/skins".into(), "/src/popamp/skins".into()]);
+        let mut portable = Paths { config_dir: "/p".into(), data_dir: "/p".into(), share_dirs: vec![] };
+        portable.add_program_dirs(Path::new("/p/popamp"));
+        assert_eq!(portable.skins_dirs(), [PathBuf::from("/p/skins")], "no folder twice");
     }
 
     #[test]

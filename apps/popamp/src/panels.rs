@@ -729,6 +729,9 @@ pub struct SkinBrowser {
     skins: Vec<std::path::PathBuf>,
     /// The skin on when the rows were made.
     current: Option<std::path::PathBuf>,
+    /// When the skins folders were last read: they are read again while
+    /// the browser is open, so a skin dropped into one shows up.
+    scanned: std::time::Instant,
 }
 
 impl SkinBrowser {
@@ -743,7 +746,7 @@ impl SkinBrowser {
         );
         form.add(Rect::new(136, by, BUTTON.0, BUTTON.1), Widget::Button { label: "Gallery…".into(), action: Act::Gallery, default: false });
         button(&mut form, w - BUTTON.0 - 10, by, "Close", Act::Close, true);
-        let mut p = SkinBrowser { form, list, skins: vec![], current: None };
+        let mut p = SkinBrowser { form, list, skins: vec![], current: None, scanned: std::time::Instant::now() };
         p.relist(model);
         p
     }
@@ -751,6 +754,7 @@ impl SkinBrowser {
     /// Lists the skins installed now, with the one on selected.
     fn relist(&mut self, model: &Model) {
         self.skins = popamp_skin::list_skins(&model.paths.skins_dirs());
+        self.scanned = std::time::Instant::now();
         self.current = model.skin_path.clone();
         let names = self.skins.iter().map(|p| p.file_name().unwrap_or_default().to_string_lossy().into_owned());
         let rows = std::iter::once("Popamp Default".to_string()).chain(names).collect();
@@ -761,7 +765,14 @@ impl SkinBrowser {
     /// A skin installed or put on elsewhere shows here too.
     fn refresh(&mut self, model: &Model) -> bool {
         if model.skin_path == self.current {
-            return false;
+            if self.scanned.elapsed() < std::time::Duration::from_secs(1) {
+                return false;
+            }
+            let now = popamp_skin::list_skins(&model.paths.skins_dirs());
+            self.scanned = std::time::Instant::now();
+            if now == self.skins {
+                return false;
+            }
         }
         self.relist(model);
         true
