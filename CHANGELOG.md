@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **A skin comes with Popamp:** Winamp Classic Amber is the skin a new
+  install starts with. It is in a `skins` folder with the program (the
+  Windows installer and zip, the packages, the AppImage); choosing the
+  built-in skin in the Skins menu is remembered as before.
 - **Toolbar mode as a Wayland program:** the bar is a layer of the
   desktop where the compositor has wlr-layer-shell (COSMIC, KDE Plasma,
   Sway, Hyprland), keeps maximized windows out of its strip and takes the

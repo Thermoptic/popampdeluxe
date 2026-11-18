@@ -2,7 +2,7 @@
 # Builds Popamp's Windows downloads from an already-compiled release
 # popamp.exe: an installer (Inno Setup) and a portable zip. Popamp-Plus-…
 # for one built with --features plus (its /VERSION says which).
-# The zip holds one folder: the exe, its papers and an empty popamp.ini,
+# The zip holds one folder: the exe, its papers, the skins and an empty popamp.ini,
 # which keeps the settings in that folder instead of %APPDATA%.
 # Usage: packaging/build-windows.sh [target/release/popamp.exe] [output-dir] [libs-dir]
 # libs-dir (default dist/libs) holds what packaging/windows/fetch-libs.sh
@@ -63,6 +63,9 @@ for f in README.md LICENSE-MIT LICENSE-APACHE THIRD_PARTY.md; do
     cp "$root/$f" "$workdir/$folder/$f"
 done
 cp -r "$libs/." "$workdir/$folder/"
+# The skins that come with it; the first is the one Popamp starts with.
+mkdir "$workdir/$folder/skins"
+cp "$root"/skins/*.wsz "$workdir/$folder/skins/"
 
 "$iscc" -Q "-DVersion=$version" "-DTitle=$title" "-DSource=$(cygpath -w "$workdir/$folder")" \
     "-DOutputName=$folder-setup" "-DOutputDir=$(cygpath -w "$outdir")" "$(cygpath -w "$here/windows/popamp.iss")"

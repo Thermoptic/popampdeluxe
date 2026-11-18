@@ -15,6 +15,10 @@ install -Dm644 "$here/popamp.desktop" "$prefix/share/applications/popamp.desktop
 install -Dm644 "$here/popamp.metainfo.xml" "$prefix/share/metainfo/popamp.metainfo.xml"
 install -Dm644 "$here/popamp-skin.xml" "$prefix/share/mime/packages/popamp-skin.xml"
 install -Dm644 "$root/assets/logo/popamp.svg" "$prefix/share/icons/hicolor/scalable/apps/popamp.svg"
+# The skin Popamp starts with, and any other that comes with it.
+for s in "$root"/skins/*.wsz; do
+    install -Dm644 "$s" "$prefix/share/popamp/skins/$(basename "$s")"
+done
 for n in 16 24 32 48 64 128 256; do
     install -Dm644 "$root/assets/logo/png/popamp-$n.png" "$prefix/share/icons/hicolor/${n}x${n}/apps/popamp.png"
 done
