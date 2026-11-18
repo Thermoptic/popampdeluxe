@@ -119,8 +119,9 @@
   - Title-bar shortcuts (Preferences > Shortcuts): a right or middle click
     on the title bar of the main, equalizer or playlist window (full size
     or shaded) can go to the previous or next track, pause, stop or switch
-    shuffle or repeat. Up to six rules, each a window, a button and an
-    action.
+    shuffle or repeat, or turn the volume up or down. The wheel over a
+    title bar (Scroll Up, Scroll Down) works without a click. Up to six
+    rules, each a window, a button or wheel direction and an action.
   - Global hotkeys, as in Winamp (off by default, Preferences > Desktop):
     Ctrl+Alt+Insert play, Home pause, End stop, Page Up/Down previous and
     next, Up/Down volume, Left/Right 5 seconds back and forward. On X11

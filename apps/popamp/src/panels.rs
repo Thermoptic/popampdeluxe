@@ -633,7 +633,7 @@ impl Preferences {
                     y += DEVICE_ROWS * ROW_H + 10;
                 }
                 Section::Shortcuts => {
-                    let note = "A right or middle click on a title bar, full size or shaded:";
+                    let note = "A click, or the wheel, over a title bar (full size or shaded):";
                     form.add_on(page, Rect::new(x0 + 4, y - 6, cw - 8, 20), Widget::Label { text: note.into(), dim: true });
                     y += 22;
                     let names = |v: Vec<&str>| v.into_iter().map(String::from).collect::<Vec<_>>();
@@ -660,7 +660,7 @@ impl Preferences {
                         shortcut_rows.push(row);
                     }
                     // Room for the options of the last row to open.
-                    y += SHORTCUT_ROWS as i32 * 30 + 100;
+                    y += SHORTCUT_ROWS as i32 * 30 + 130;
                 }
                 Section::Desktop => {
                     form.add_on(page, Rect::new(x0, y, cw, 22 + 3 * 22), Widget::Group { label: "Open with Popamp".into() });

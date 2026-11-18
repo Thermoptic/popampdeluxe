@@ -1,6 +1,7 @@
-//! Title-bar shortcuts: what a right or middle click on the title bar (the
-//! part that drags the window) of the main, equalizer or playlist window
-//! does, whether the window is full-size or shaded. Chosen under
+//! Title-bar shortcuts: what a right or middle click, or the mouse wheel
+//! turned while the pointer is over the title bar (the part that drags the
+//! window), of the main, equalizer or playlist window does, whether the
+//! window is full-size or shaded. Chosen under
 //! Preferences > Shortcuts, kept in the `title_shortcuts` setting as
 //! `window:button:action` rules joined by `;`, for example
 //! `eq:middle:pause;main:right:next`.
@@ -19,19 +20,29 @@ pub const TARGETS: [(WindowKey, &str, &str); 3] = [
 pub enum Click {
     Right,
     Middle,
+    /// The wheel turned away from the user, once for each notch.
+    ScrollUp,
+    ScrollDown,
 }
 
-/// The mouse buttons that have shortcuts.
-pub const CLICKS: [(Click, &str, &str); 2] = [(Click::Right, "right", "Right Mouse"), (Click::Middle, "middle", "Middle Mouse")];
+/// The mouse buttons and wheel turns that have shortcuts.
+pub const CLICKS: [(Click, &str, &str); 4] = [
+    (Click::Right, "right", "Right Mouse"),
+    (Click::Middle, "middle", "Middle Mouse"),
+    (Click::ScrollUp, "scrollup", "Scroll Up"),
+    (Click::ScrollDown, "scrolldown", "Scroll Down"),
+];
 
 /// What a click can do.
-pub const ACTIONS: [(Command, &str, &str); 6] = [
+pub const ACTIONS: [(Command, &str, &str); 8] = [
     (Command::Previous, "previous", "Previous track"),
     (Command::Next, "next", "Next track"),
     (Command::Pause, "pause", "Pause"),
     (Command::Stop, "stop", "Stop"),
     (Command::ToggleShuffle, "shuffle", "Shuffle on/off"),
     (Command::ToggleRepeat, "repeat", "Repeat on/off"),
+    (Command::VolumeUp, "volup", "Vol Up"),
+    (Command::VolumeDown, "voldown", "Vol Down"),
 ];
 
 /// One rule: a click on a window's title bar runs a command.
@@ -89,6 +100,14 @@ mod tests {
         assert_eq!(find(spec, WindowKey::Eq, Click::Right), None);
         assert_eq!(find(spec, WindowKey::Playlist, Click::Middle), None);
         assert_eq!(find("", WindowKey::Main, Click::Right), None);
+    }
+
+    #[test]
+    fn the_wheel_has_rules_too() {
+        let spec = "eq:scrollup:volup;eq:scrolldown:voldown";
+        assert_eq!(find(spec, WindowKey::Eq, Click::ScrollUp), Some(Command::VolumeUp));
+        assert_eq!(find(spec, WindowKey::Eq, Click::ScrollDown), Some(Command::VolumeDown));
+        assert_eq!(find(spec, WindowKey::Main, Click::ScrollUp), None);
     }
 
     #[test]

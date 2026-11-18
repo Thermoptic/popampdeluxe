@@ -13,7 +13,10 @@ All notable changes to this project are documented here. The format follows
   window does (the part that drags the window, full size or shaded):
   previous or next track, pause, stop, shuffle or repeat on/off. For
   example, a middle click on the equalizer window pauses. A right click
-  with a shortcut set runs it instead of opening the menu.
+  with a shortcut set runs it instead of opening the menu. The mouse
+  wheel over a title bar can run a command too (Scroll Up, Scroll Down),
+  such as Vol Up or Vol Down: the more you scroll, the more it does. No
+  click is needed, the pointer only has to be over the title bar.
 - **A `skins` folder beside the program:** any `.wsz` skin put there shows
   up in the Skin browser and the Skins menu. The Skin browser looks at the
   folders again while it is open, so a skin dropped in appears at once.

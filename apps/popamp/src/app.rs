@@ -1411,12 +1411,22 @@ impl App {
     /// Shortcuts says for it. Returns whether it did; the right button then
     /// opens no menu.
     fn title_shortcut(&mut self, el: &ActiveEventLoop, k: WindowKey, click: Click) -> bool {
+        self.title_shortcut_times(el, k, click, 1)
+    }
+
+    /// As [`Self::title_shortcut`], running the command `times` times, for
+    /// the notches of the wheel.
+    fn title_shortcut_times(&mut self, el: &ActiveEventLoop, k: WindowKey, click: Click, times: i32) -> bool {
         let Some(command) = shortcuts::find(&self.model.settings().title_shortcuts, k, click) else { return false };
         let at = self.input(k, false, false);
         if !self.skins[k.index()].on_title(&self.model, at.x, at.y) {
             return false;
         }
-        self.run(el, command);
+        for _ in 0..times {
+            self.model.exec(command);
+        }
+        self.after_model(el);
+        self.redraw_all();
         true
     }
 
@@ -1486,7 +1496,12 @@ impl App {
         }
     }
 
-    fn wheel(&mut self, k: WindowKey, steps: i32) {
+    fn wheel(&mut self, el: &ActiveEventLoop, k: WindowKey, steps: i32) {
+        // Over a title bar the wheel can run a command, once for each notch.
+        let click = if steps > 0 { Click::ScrollUp } else { Click::ScrollDown };
+        if steps != 0 && self.title_shortcut_times(el, k, click, steps.abs()) {
+            return;
+        }
         if steps != 0 {
             let input = self.input(k, false, false);
             self.skins[k.index()].wheel(&mut self.model, input.x, input.y, steps);
@@ -1551,7 +1566,7 @@ impl App {
                     E::Button(_, button, true) => self.mouse_down(el, k, button),
                     E::Button(_, MouseButton::Left, false) => self.mouse_up(el, k),
                     E::Button(..) => {}
-                    E::Wheel(_, steps) => self.wheel(k, steps),
+                    E::Wheel(_, steps) => self.wheel(el, k, steps),
                     E::Redraw(_) => self.render(k),
                     E::MainMoved(_) => {}
                 }
@@ -2213,6 +2228,7 @@ impl ApplicationHandler<AppEvent> for App {
                 _ => {}
             },
             WindowEvent::MouseWheel { delta, .. } => self.wheel(
+                el,
                 k,
                 match delta {
                     MouseScrollDelta::LineDelta(_, y) => y.round() as i32,
