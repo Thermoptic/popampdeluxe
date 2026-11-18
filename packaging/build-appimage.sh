@@ -97,7 +97,7 @@ install -Dm644 "$root/assets/logo/popamp.svg" "$appdir/usr/share/icons/hicolor/s
 for n in 16 24 32 48 64 128 256; do
     install -Dm644 "$root/assets/logo/png/popamp-$n.png" "$appdir/usr/share/icons/hicolor/${n}x${n}/apps/popamp.png"
 done
-for f in README.md LICENSE-MIT LICENSE-APACHE THIRD_PARTY.md; do
+for f in README.md popampdeluxe.txt LICENSE-MIT LICENSE-APACHE THIRD_PARTY.md; do
     install -Dm644 "$root/$f" "$appdir/usr/share/doc/popamp/$f"
 done
 for s in "$root"/skins/*.wsz; do

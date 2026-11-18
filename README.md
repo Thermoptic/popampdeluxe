@@ -1,5 +1,24 @@
 <h1 align="center">Popamp</h1>
 
+## What's new in Popamp Deluxe
+
+*Updated 2026-11-18. The same list, as a text file that comes with every
+download: [popampdeluxe.txt](popampdeluxe.txt).*
+
+- **Title-bar shortcuts** (Preferences > Shortcuts). Choose what a right
+  click, a middle click or the mouse wheel on the title bar of the main,
+  equalizer or playlist window does, in full size or windowshade mode:
+  previous or next track, pause, stop, shuffle, repeat, volume up or down.
+  Middle-click the equalizer to pause, or hover its title bar and scroll
+  to change the volume, with no click needed.
+- **A skin comes with the player.** Winamp Classic Amber is the skin a new
+  install starts with, in a `skins` folder with the program.
+- **A `skins` folder beside the program.** Drop any `.wsz` in it and it
+  shows up in the Skin Browser (Alt+S) at once, even while the browser is
+  open.
+- **Volume and balance in the shaded equalizer,** as in Winamp.
+
+
 <p align="center">
   <a href="#install"><img src="assets/readme/hero.png" alt="Popamp with three of its skins: Default, Steel and Modern" width="100%"></a>
 </p>

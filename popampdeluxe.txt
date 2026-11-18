@@ -1,0 +1,116 @@
+==============================================================================
+
+                            P O P A M P   D E L U X E
+
+                  A Winamp-style player for Windows and Linux
+                         What is new, in plain words
+
+==============================================================================
+
+  Version ........ 1.0.1 and later
+  Updated ........ 2026-11-18
+  Project ........ https://github.com/Thermoptic/popampdeluxe
+
+  This file lists the biggest changes in Popamp Deluxe, one feature at a
+  time, with what each one does. Small fixes are left out; the full list
+  is in CHANGELOG.md.
+
+
+------------------------------------------------------------------------------
+  NEWEST FIRST
+------------------------------------------------------------------------------
+
+
+  2026-11-18   TITLE-BAR SHORTCUTS
+  ..........................................................................
+
+  Preferences > Shortcuts (under Internet)
+
+  Decide what happens when you click, or turn the mouse wheel, on the top
+  of a window: the bar you drag to move it. It works on the Main window,
+  the Equalizer window and the Playlist window, both full size and in
+  windowshade mode.
+
+  Each of the six rows is built from three drop-down lists:
+
+     [ Window ]        [ Mouse ]          [ Action ]
+     Main window       Right Mouse        Previous track
+     Equalizer window  Middle Mouse       Next track
+     Playlist window   Scroll Up          Pause
+                       Scroll Down        Stop
+                                          Shuffle on/off
+                                          Repeat on/off
+                                          Vol Up
+                                          Vol Down
+
+  Examples
+
+     Equalizer window + Middle Mouse + Pause
+        A middle click on the equalizer's title bar pauses the music.
+
+     Equalizer window + Scroll Up + Vol Up
+        Hold the pointer over the title bar and scroll up: the volume goes
+        up. The more you scroll, the more it changes. No click is needed,
+        hovering is enough. Scroll Down + Vol Down does the opposite.
+
+  Notes
+
+     * A Right Mouse rule replaces the menu on that title bar. Without a
+       rule, the menu opens as before.
+     * If two rows match the same window and button, the first one counts.
+     * A row set to "(nothing)" does nothing.
+
+
+  2026-11-18   A SKIN COMES WITH THE PLAYER
+  ..........................................................................
+
+  Winamp Classic Amber is now the skin Popamp starts with. It is installed
+  in a "skins" folder together with the program: in the Windows installer
+  and the portable zip, in the Linux packages (deb and rpm) and in the
+  AppImage.
+
+  If you choose the built-in skin in the Skins menu, Popamp remembers it.
+  If the skin file is ever missing, Popamp quietly uses the built-in skin
+  instead of showing an error.
+
+
+  2026-11-18   A "SKINS" FOLDER BESIDE THE PROGRAM
+  ..........................................................................
+
+  Put any .wsz skin in the "skins" folder next to the program and it shows
+  up in the Skin Browser (Alt+S) and in the Skins menu. No installing, no
+  restart.
+
+  The Skin Browser looks at the folder again every second while it is open,
+  so a skin you drop in appears at once. Skins in your user folder
+  (%APPDATA%\popamp\skins on Windows) are still found, too.
+
+
+  2026-11-18   VOLUME AND BALANCE IN THE SHADED EQUALIZER
+  ..........................................................................
+
+  The equalizer in windowshade mode now has volume and balance sliders,
+  as in Winamp. The slider thumb changes shape with where it is in the
+  range: low, middle or high.
+
+
+------------------------------------------------------------------------------
+  WHERE TO FIND THINGS
+------------------------------------------------------------------------------
+
+     Skin Browser ............ Alt+S, or Skins > Skin browser
+     Preferences ............. Ctrl+P
+     Shortcuts ............... Preferences > Shortcuts
+     Skins folder ............ "skins", next to the program
+
+
+------------------------------------------------------------------------------
+  MORE
+------------------------------------------------------------------------------
+
+     Full change list ........ CHANGELOG.md
+     All features ............ docs/features.md
+     Make your own skin ...... docs/skin-format.md
+     Licence ................. MIT or Apache-2.0 (LICENSE-MIT, LICENSE-APACHE)
+
+==============================================================================

@@ -127,6 +127,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           path: dist
@@ -135,6 +136,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # What is new, as a file of its own beside the downloads.
+          cp "$GITHUB_WORKSPACE/popampdeluxe.txt" dist/
           cd dist
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt

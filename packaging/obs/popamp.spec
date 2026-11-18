@@ -111,7 +111,7 @@ test "$(target/release/popamp /VERSION)" = "%{name} %{version}"
 
 %files
 %license LICENSE-MIT LICENSE-APACHE
-%doc README.md CHANGELOG.md THIRD_PARTY.md
+%doc README.md popampdeluxe.txt CHANGELOG.md THIRD_PARTY.md
 %{_bindir}/popamp
 %{_datadir}/applications/popamp.desktop
 %{_datadir}/metainfo/popamp.metainfo.xml

@@ -59,7 +59,7 @@ trap 'rm -rf "$workdir"' EXIT INT TERM
 folder="${name}-${version}-windows-x86_64"
 mkdir "$workdir/$folder"
 cp "$bin" "$workdir/$folder/popamp.exe"
-for f in README.md LICENSE-MIT LICENSE-APACHE THIRD_PARTY.md; do
+for f in README.md popampdeluxe.txt LICENSE-MIT LICENSE-APACHE THIRD_PARTY.md; do
     cp "$root/$f" "$workdir/$folder/$f"
 done
 cp -r "$libs/." "$workdir/$folder/"

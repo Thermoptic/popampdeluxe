@@ -60,7 +60,7 @@ doc="$pkg/usr/share/doc/$package"
 
 sh "$here/install-files.sh" "$bin" "$pkg/usr"
 strip "$pkg/usr/bin/popamp"
-for f in README.md LICENSE-MIT LICENSE-APACHE THIRD_PARTY.md; do
+for f in README.md popampdeluxe.txt LICENSE-MIT LICENSE-APACHE THIRD_PARTY.md; do
     install -Dm644 "$root/$f" "$doc/$f"
 done
 cat > "$doc/copyright" <<EOF
