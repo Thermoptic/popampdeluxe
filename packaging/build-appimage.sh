@@ -100,6 +100,9 @@ done
 for f in README.md LICENSE-MIT LICENSE-APACHE THIRD_PARTY.md; do
     install -Dm644 "$root/$f" "$appdir/usr/share/doc/popamp/$f"
 done
+for s in "$root"/skins/*.wsz; do
+    install -Dm644 "$s" "$appdir/usr/share/popamp/skins/$(basename "$s")"
+done
 # appimagetool takes the desktop file and icon from the AppDir's top level.
 install -m644 "$here/popamp.desktop" "$appdir/popamp.desktop"
 install -m644 "$root/assets/logo/png/popamp-256.png" "$appdir/popamp.png"
@@ -107,6 +110,8 @@ install -m644 "$root/assets/logo/png/popamp-256.png" "$appdir/popamp.png"
 cat > "$appdir/AppRun" <<'EOF'
 #!/bin/sh
 here=$(dirname "$(readlink -f "$0")")
+XDG_DATA_DIRS="$here/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+export XDG_DATA_DIRS
 exec "$here/usr/bin/popamp" "$@"
 EOF
 chmod +x "$appdir/AppRun"

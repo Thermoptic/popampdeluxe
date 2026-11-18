@@ -116,6 +116,7 @@ test "$(target/release/popamp /VERSION)" = "%{name} %{version}"
 %{_datadir}/applications/popamp.desktop
 %{_datadir}/metainfo/popamp.metainfo.xml
 %{_datadir}/mime/packages/popamp-skin.xml
+%{_datadir}/popamp/skins/*.wsz
 %{_datadir}/icons/hicolor/*/apps/popamp.*
 
 %changelog

@@ -123,6 +123,9 @@ impl IniValue for Option<BarEdge> {
     }
 }
 
+/// The skin a new install starts with, shipped in the `skins` folder.
+pub const DEFAULT_SKIN: &str = "Winamp_Classic_Amber.wsz";
+
 /// The window sizes offered, in percent.
 pub const ZOOMS: [i32; 7] = [100, 125, 150, 175, 200, 250, 300];
 
@@ -263,7 +266,10 @@ settings! {
     zeropadplnum: bool = false,
     titlefmt: String = DEFAULT_TITLE_FORMAT.to_string(),
     // Skins.
-    skin: String = String::new(),
+    /// The skin: a path, or the file name of one in the skins folders; empty
+    /// for the built-in skin. New installs start with the skin that comes with
+    /// the program, or the built-in one where it is missing.
+    skin: String = DEFAULT_SKIN.to_string(),
     /// The colour set wanted of a skin that has several, by name; a skin
     /// without a set of this name shows its first.
     skin_colors: String = String::new(),
@@ -387,7 +393,9 @@ impl Paths {
     fn system() -> Self {
         let home = std::env::home_dir().unwrap_or_else(|| PathBuf::from("."));
         let dir = std::env::var_os("APPDATA").map(PathBuf::from).unwrap_or_else(|| home.join("AppData").join("Roaming")).join("popamp");
-        Self { config_dir: dir.clone(), data_dir: dir, share_dirs: Vec::new() }
+        // What the installer put next to popamp.exe (its `skins` folder).
+        let share_dirs = std::env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf)).into_iter().collect();
+        Self { config_dir: dir.clone(), data_dir: dir, share_dirs }
     }
 
     /// `~/Library/Application Support/popamp`, and the app bundle's

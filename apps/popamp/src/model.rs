@@ -299,7 +299,18 @@ impl Model {
         };
         let skin = m.settings().skin.clone();
         if !skin.is_empty() {
-            m.set_skin(Some(PathBuf::from(skin)));
+            // A bare file name is looked for in the skins folders; the
+            // skin that comes with the program may be missing, which is no error.
+            let named = Path::new(&skin);
+            let found = if named.components().count() == 1 {
+                m.paths.skins_dirs().into_iter().map(|d| d.join(named)).find(|p| p.exists())
+            } else {
+                Some(named.to_path_buf())
+            };
+            match found {
+                Some(p) => m.set_skin(Some(p)),
+                None => log::warn!("skin {skin} not found in the skins folders"),
+            }
         }
         m.push_engine_settings();
         #[cfg(feature = "plugins")]

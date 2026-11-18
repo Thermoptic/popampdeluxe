@@ -1,6 +1,7 @@
 /target
 *.exe
 *.wsz
+!/skins/*.wsz
 /local/
 *.swp
 /dist
