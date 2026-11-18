@@ -44,8 +44,11 @@ ksni = { version = "0.3", default-features = false, features = ["async-io", "blo
 # (see platform/wayland.rs). The versions winit and softbuffer use.
 wayland-client = "0.31"
 wayland-backend = { version = "0.3", features = ["client_system"] }
-wayland-protocols = { version = "0.32", features = ["client"] }
+wayland-protocols = { version = "0.32", features = ["client", "unstable"] }
 wayland-cursor = "0.31"
+# winit's toolkit, for the xdg_surface of its main window that the menus,
+# the equalizer and the playlist are popups of.
+smithay-client-toolkit = { version = "0.19", default-features = false }
 memmap2 = "0.9"
 
 # System fonts through CoreText, and Finder's Apple Events.

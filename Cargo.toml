@@ -62,3 +62,10 @@ opt-level = 2
 [profile.release]
 lto = "thin"
 codegen-units = 4
+
+# winit with one change, on the popamp-0.30 branch of Popamp's fork:
+# under COSMIC, which calls its floating windows tiled, winit 0.30 does
+# not resize the main window when Popamp asks it to. Rebase the branch
+# onto each new 0.30 release.
+[patch.crates-io]
+winit = { git = "https://github.com/popamp/winit", branch = "popamp-0.30" }

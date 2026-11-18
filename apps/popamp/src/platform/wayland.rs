@@ -1,8 +1,15 @@
 //! Wayland: a program cannot place its windows there, so only the main
 //! window is a window (winit's). The equalizer, the playlist, menus and
-//! tooltips are subsurfaces of it, which a program does place, each
+//! tooltips are popups of it (xdg_popup), which a program does place, each
 //! against the main window. winit knows nothing of them: they are made,
 //! drawn and given the mouse here, on winit's connection.
+//!
+//! They are popups rather than subsurfaces because a compositor may show a
+//! window's subsurfaces only within the window's outline: COSMIC cuts every
+//! floating window to its rounded rectangle, and the equalizer and playlist
+//! were then not seen at all, the menus only where they lay over the main
+//! window. A popup is drawn apart from the window. Subsurfaces remain where
+//! the compositor has no popups to give, or with `POPAMP_WAYLAND_SUBSURFACES=1`.
 //!
 //! Positions are the same "screen" pixels the rest of the program counts
 //! in. The main window never moves in them, since nobody tells where the
@@ -12,7 +19,7 @@
 use super::{shape_rects, Mask};
 use popamp_skin::cursors::CursorImage;
 use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::os::fd::AsFd;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -32,9 +39,17 @@ use wayland_client::protocol::wl_subcompositor::WlSubcompositor;
 use wayland_client::protocol::wl_subsurface::WlSubsurface;
 use wayland_client::protocol::wl_surface::WlSurface;
 use wayland_client::{delegate_noop, Connection, Dispatch, EventQueue, Proxy, QueueHandle, WEnum};
+use wayland_protocols::wp::relative_pointer::zv1::client::zwp_relative_pointer_manager_v1::ZwpRelativePointerManagerV1;
+use wayland_protocols::wp::relative_pointer::zv1::client::zwp_relative_pointer_v1::{self, ZwpRelativePointerV1};
 use wayland_protocols::wp::viewporter::client::wp_viewport::WpViewport;
 use wayland_protocols::wp::viewporter::client::wp_viewporter::WpViewporter;
+use wayland_protocols::xdg::shell::client::xdg_popup::{self, XdgPopup};
+use wayland_protocols::xdg::shell::client::xdg_positioner::{self, XdgPositioner};
+use wayland_protocols::xdg::shell::client::xdg_surface::{self, XdgSurface};
+use wayland_protocols::xdg::shell::client::xdg_toplevel::XdgToplevel;
+use wayland_protocols::xdg::shell::client::xdg_wm_base::{self, XdgWmBase};
 use winit::event::MouseButton;
+use winit::platform::wayland::WindowExtWayland as _;
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle};
 use winit::window::Window;
 
@@ -72,6 +87,17 @@ struct Shared {
     scale: Cell<f64>,
     places: RefCell<HashMap<u32, Rc<Place>>>,
     redraws: RefCell<Vec<u32>>,
+    /// Popups: the configure each is to acknowledge before it is next shown.
+    configures: RefCell<HashMap<u32, u32>>,
+    /// Popups the compositor took off the screen, to be made again.
+    dismissed: RefCell<HashSet<u32>>,
+    /// Where the compositor is to put each popup once it acknowledges the
+    /// configure: until then it is still where it was, and the mouse is
+    /// reported from there.
+    placed: RefCell<HashMap<u32, Point>>,
+    /// Positions asked for with `reposition` and not yet answered, by
+    /// popup, with the token each was sent with.
+    asked: RefCell<HashMap<u32, Vec<(u32, Point)>>>,
 }
 
 impl Shared {
@@ -97,6 +123,16 @@ struct State {
     pointer: Option<Pointer>,
     /// Wheel movement not yet a whole step.
     wheel: f64,
+    /// Where the mouse last was, in screen pixels.
+    last: (f64, f64),
+    /// While a button is held over a subsurface, where the mouse is, from
+    /// how far it moved rather than from where the subsurface is: one being
+    /// dragged is not where the compositor reports the mouse from until a
+    /// while after it moves, and the mouse read from it would run ahead of
+    /// itself. `None` too where the compositor tells no such movement.
+    held: Option<(u32, (f64, f64))>,
+    /// The compositor tells how far the mouse moves.
+    relative: bool,
 }
 
 delegate_noop!(State: WlCompositor);
@@ -109,6 +145,71 @@ delegate_noop!(State: WpViewport);
 delegate_noop!(State: ignore WlSurface);
 delegate_noop!(State: ignore WlShm);
 delegate_noop!(State: ignore WlSeat);
+delegate_noop!(State: XdgPositioner);
+delegate_noop!(State: ZwpRelativePointerManagerV1);
+
+/// The mouse moved by this much, wherever its pointer is drawn.
+impl Dispatch<ZwpRelativePointerV1, ()> for State {
+    fn event(state: &mut State, _: &ZwpRelativePointerV1, event: zwp_relative_pointer_v1::Event, _: &(), _: &Connection, _: &QueueHandle<State>) {
+        if let zwp_relative_pointer_v1::Event::RelativeMotion { dx, dy, .. } = event {
+            let scale = state.shared.scale.get();
+            if let Some((id, at)) = &mut state.held {
+                at.0 += dx * scale;
+                at.1 += dy * scale;
+                let p = (at.0.round() as i32, at.1.round() as i32);
+                state.events.push(Event::Moved(*id, p));
+            }
+        }
+    }
+}
+
+/// The compositor asks whether the program still answers.
+impl Dispatch<XdgWmBase, ()> for State {
+    fn event(_: &mut State, wm: &XdgWmBase, event: xdg_wm_base::Event, _: &(), _: &Connection, _: &QueueHandle<State>) {
+        if let xdg_wm_base::Event::Ping { serial } = event {
+            wm.pong(serial);
+        }
+    }
+}
+
+/// A popup may be shown, after it acknowledges this; it is drawn again for that.
+impl Dispatch<XdgSurface, u32> for State {
+    fn event(state: &mut State, _: &XdgSurface, event: xdg_surface::Event, id: &u32, _: &Connection, _: &QueueHandle<State>) {
+        if let xdg_surface::Event::Configure { serial } = event {
+            state.shared.configures.borrow_mut().insert(*id, serial);
+            state.shared.redraws.borrow_mut().push(*id);
+        }
+    }
+}
+
+/// Where the compositor puts a popup, from the main window's corner.
+impl Dispatch<XdgPopup, u32> for State {
+    fn event(state: &mut State, _: &XdgPopup, event: xdg_popup::Event, id: &u32, _: &Connection, _: &QueueHandle<State>) {
+        let shared = &state.shared;
+        match event {
+            xdg_popup::Event::Configure { x, y, .. } => {
+                // The popup goes where it was asked to be, as it may not be
+                // moved to fit the screen; the compositor's figures are
+                // not used, since they need not count from the same corner.
+                log::debug!(target: "moves", "popup {id} configured at {x},{y}, asked {:?}", shared.placed.borrow().get(id));
+            }
+            xdg_popup::Event::Repositioned { token } => {
+                let mut asked = shared.asked.borrow_mut();
+                let list = asked.entry(*id).or_default();
+                if let Some(i) = list.iter().position(|&(t, _)| t == token) {
+                    shared.placed.borrow_mut().insert(*id, list[i].1);
+                    list.drain(..=i);
+                }
+            }
+            xdg_popup::Event::PopupDone => {
+                log::debug!("Wayland: popup {id} dismissed");
+                shared.dismissed.borrow_mut().insert(*id);
+                shared.redraws.borrow_mut().push(*id);
+            }
+            _ => {}
+        }
+    }
+}
 
 impl Dispatch<WlRegistry, GlobalListContents> for State {
     fn event(_: &mut State, _: &WlRegistry, _: wl_registry::Event, _: &GlobalListContents, _: &Connection, _: &QueueHandle<State>) {}
@@ -138,9 +239,10 @@ impl Dispatch<WlCallback, u32> for State {
 impl Dispatch<WlPointer, ()> for State {
     fn event(state: &mut State, pointer: &WlPointer, event: wl_pointer::Event, _: &(), _: &Connection, _: &QueueHandle<State>) {
         use wl_pointer::Event as E;
-        let at = |state: &State, id: u32, x: f64, y: f64| {
+        let at = |state: &mut State, id: u32, x: f64, y: f64| {
             let (shared, scale) = (&state.shared, state.shared.scale.get());
             let known = shared.places.borrow().get(&id).map_or((0, 0), |p| p.known.get());
+            state.last = (known.0 as f64 + x * scale, known.1 as f64 + y * scale);
             (known.0 + (x * scale) as i32, known.1 + (y * scale) as i32)
         };
         match event {
@@ -155,16 +257,22 @@ impl Dispatch<WlPointer, ()> for State {
                 if let Some(p) = &state.pointer {
                     pointer.set_cursor(serial, Some(&p.surface), p.hot.0, p.hot.1);
                 }
-                state.events.push(Event::Moved(id, at(state, id, surface_x, surface_y)));
+                let p = at(state, id, surface_x, surface_y);
+                state.events.push(Event::Moved(id, p));
             }
             E::Leave { .. } => {
+                state.held = None;
                 if let Some((id, _)) = state.over.take() {
                     state.events.push(Event::Left(id));
                 }
             }
             E::Motion { surface_x, surface_y, .. } => {
+                if state.held.is_some() {
+                    return;
+                }
                 if let Some((id, _)) = state.over {
-                    state.events.push(Event::Moved(id, at(state, id, surface_x, surface_y)));
+                    let p = at(state, id, surface_x, surface_y);
+                    state.events.push(Event::Moved(id, p));
                 }
             }
             E::Button { button, state: pressed, .. } => {
@@ -176,7 +284,9 @@ impl Dispatch<WlPointer, ()> for State {
                     0x112 => MouseButton::Middle,
                     _ => return,
                 };
-                state.events.push(Event::Button(id, button, pressed == WEnum::Value(wl_pointer::ButtonState::Pressed)));
+                let pressed = pressed == WEnum::Value(wl_pointer::ButtonState::Pressed);
+                state.held = (pressed && state.relative).then_some((id, state.last));
+                state.events.push(Event::Button(id, button, pressed));
             }
             E::Axis { axis: WEnum::Value(wl_pointer::Axis::VerticalScroll), value, .. } => {
                 let Some((id, _)) = state.over else { return };
@@ -253,9 +363,12 @@ pub struct Wayland {
     state: State,
     subcompositor: WlSubcompositor,
     viewporter: Option<WpViewporter>,
+    /// What the other windows are popups of; `None` makes them subsurfaces.
+    popups: Option<(XdgWmBase, XdgSurface)>,
     /// The main window's surface, which is winit's.
     main: WlSurface,
     _pointer: WlPointer,
+    _relative: Option<ZwpRelativePointerV1>,
     /// The theme the arrow comes from: it owns the arrow's picture.
     _theme: Option<wayland_cursor::CursorTheme>,
 }
@@ -269,10 +382,17 @@ impl Wayland {
         else {
             return None;
         };
-        Some(Self::connect(display.display.as_ptr().cast(), window.surface.as_ptr().cast(), main.scale_factor(), origin))
+        let toplevel = main.xdg_toplevel().map(|t| t.as_ptr());
+        Some(Self::connect(display.display.as_ptr().cast(), window.surface.as_ptr().cast(), toplevel, main.scale_factor(), origin))
     }
 
-    fn connect(display: *mut std::ffi::c_void, surface: *mut std::ffi::c_void, scale: f64, origin: Point) -> Result<Wayland, String> {
+    fn connect(
+        display: *mut std::ffi::c_void,
+        surface: *mut std::ffi::c_void,
+        toplevel: Option<*mut std::ffi::c_void>,
+        scale: f64,
+        origin: Point,
+    ) -> Result<Wayland, String> {
         let err = |e: &dyn std::fmt::Display| format!("Wayland: {e}");
         // SAFETY: both pointers come from a living winit window, which the
         // caller keeps for as long as it keeps this.
@@ -286,12 +406,52 @@ impl Wayland {
         let shm: WlShm = globals.bind(&qh, 1..=1, ()).map_err(|e| err(&e))?;
         let seat: WlSeat = globals.bind(&qh, 1..=4, ()).map_err(|e| err(&e))?;
         let viewporter: Option<WpViewporter> = globals.bind(&qh, 1..=1, ()).ok();
+        let popups = if std::env::var_os("POPAMP_WAYLAND_SUBSURFACES").is_some_and(|v| v == "1") {
+            None
+        } else {
+            // SAFETY: as above; the toplevel is winit's, of the same window.
+            // Popups move with `reposition`, from version 3 on.
+            let parent = toplevel.and_then(|t| unsafe { ObjectId::from_ptr(XdgToplevel::interface(), t.cast()) }.ok());
+            let parent = parent.and_then(|id| XdgToplevel::from_id(&conn, id).ok());
+            let parent = parent.and_then(|t| smithay_client_toolkit::shell::xdg::window::Window::from_xdg_toplevel(&t));
+            let wm = globals.bind::<XdgWmBase, _, _>(&qh, 3..=6, ()).ok();
+            match (wm, parent) {
+                (Some(wm), Some(parent)) => {
+                    use smithay_client_toolkit::shell::xdg::XdgSurface as _;
+                    Some((wm, parent.xdg_surface().clone()))
+                }
+                (wm, parent) => {
+                    log::info!("Wayland: subsurfaces, not popups (xdg_wm_base 3: {}, main window's: {})", wm.is_some(), parent.is_some());
+                    None
+                }
+            }
+        };
         let pointer = seat.get_pointer(&qh, ());
-        let shared =
-            Rc::new(Shared { origin: Cell::new(origin), scale: Cell::new(scale), places: Default::default(), redraws: Default::default() });
+        let relative = globals.bind::<ZwpRelativePointerManagerV1, _, _>(&qh, 1..=1, ()).ok();
+        let relative = relative.map(|m| m.get_relative_pointer(&pointer, &qh, ()));
+        log::debug!(target: "moves", "relative pointer: {}", relative.is_some());
+        let shared = Rc::new(Shared {
+            origin: Cell::new(origin),
+            scale: Cell::new(scale),
+            places: Default::default(),
+            redraws: Default::default(),
+            configures: Default::default(),
+            dismissed: Default::default(),
+            placed: Default::default(),
+            asked: Default::default(),
+        });
         let link = Link { conn, qh, compositor, shm, shared: shared.clone() };
-        let state = State { shared, events: Vec::new(), over: None, pointer: None, wheel: 0.0 };
-        let mut wayland = Wayland { link, queue, state, subcompositor, viewporter, main, _pointer: pointer, _theme: None };
+        let state = State {
+            shared,
+            events: Vec::new(),
+            over: None,
+            pointer: None,
+            wheel: 0.0,
+            last: (0.0, 0.0),
+            held: None,
+            relative: relative.is_some(),
+        };
+        let mut wayland = Wayland { link, queue, state, subcompositor, viewporter, popups, main, _pointer: pointer, _relative: relative, _theme: None };
         wayland.set_cursor(None);
         Ok(wayland)
     }
@@ -312,9 +472,28 @@ impl Wayland {
     pub fn sub(&self, pos: Point, input: bool) -> (Sub, Shm) {
         let (link, qh) = (&self.link, &self.link.qh);
         let surface = link.compositor.create_surface(qh, ());
-        let role = self.subcompositor.get_subsurface(&surface, &self.main, qh, ());
-        // Shown when drawn, not when the main window next is.
-        role.set_desync();
+        let role = match &self.popups {
+            Some((wm, parent)) => Role::Popup(Rc::new(Popup {
+                wm: wm.clone(),
+                parent: parent.clone(),
+                shown: RefCell::new(None),
+                pos: Cell::new(pos),
+                size: Cell::new((1, 1)),
+                configured: Cell::new(false),
+                token: Cell::new(0),
+                moving: Cell::new(None),
+            })),
+            None => {
+                let role = self.subcompositor.get_subsurface(&surface, &self.main, qh, ());
+                // Shown when drawn, not when the main window next is.
+                role.set_desync();
+                Role::Sub(role)
+            }
+        };
+        let popup = match &role {
+            Role::Popup(p) => Some(p.clone()),
+            Role::Sub(_) => None,
+        };
         let viewport = self.viewporter.as_ref().map(|v| v.get_viewport(&surface, qh, ()));
         if !input {
             let nothing = link.compositor.create_region(qh, ());
@@ -322,13 +501,16 @@ impl Wayland {
             nothing.destroy();
         }
         let place = Rc::new(Place::default());
+        place.known.set(pos);
         let id = surface.id().protocol_id();
         if input {
             link.shared.places.borrow_mut().insert(id, place.clone());
         }
         let sub = Sub { link: link.clone(), surface: surface.clone(), role, main: self.main.clone(), place };
         sub.move_to(pos);
-        (sub, Shm::new(link.clone(), surface, viewport, true))
+        let mut shm = Shm::new(link.clone(), surface, viewport, true);
+        shm.popup = popup;
+        (sub, shm)
     }
 
     /// The picture of the mouse over the subsurfaces: a skin's cursor, or
@@ -385,11 +567,119 @@ impl Wayland {
     }
 }
 
-/// A subsurface of the main window.
+/// What makes a surface a part of the main window.
+enum Role {
+    Sub(WlSubsurface),
+    Popup(Rc<Popup>),
+}
+
+/// A popup of the main window, which its `Sub` places and its `Shm` shows.
+/// It is made when it is first shown and unmade when it is hidden: a popup
+/// once taken off the screen is not shown again.
+struct Popup {
+    wm: XdgWmBase,
+    /// The main window's.
+    parent: XdgSurface,
+    shown: RefCell<Option<(XdgSurface, XdgPopup)>>,
+    /// Where it is to be, in screen pixels.
+    pos: Cell<Point>,
+    /// Its size in the compositor's units.
+    size: Cell<Point>,
+    /// It has acknowledged a configure since it was made.
+    configured: Cell<bool>,
+    /// The last `reposition`'s token.
+    token: Cell<u32>,
+    /// Where the next commit puts it.
+    moving: Cell<Option<Point>>,
+}
+
+impl Popup {
+    /// Where the popup goes: `pos` from the main window's corner, never
+    /// moved to fit the screen, which would take it off the windows it is
+    /// docked to.
+    fn positioner(&self, link: &Link) -> XdgPositioner {
+        let Link { qh, shared, .. } = link;
+        let p = self.wm.create_positioner(qh, ());
+        let ((w, h), pos, origin) = (self.size.get(), self.pos.get(), shared.origin.get());
+        p.set_size(w.max(1), h.max(1));
+        p.set_anchor_rect(0, 0, 1, 1);
+        p.set_anchor(xdg_positioner::Anchor::TopLeft);
+        p.set_gravity(xdg_positioner::Gravity::BottomRight);
+        p.set_constraint_adjustment(xdg_positioner::ConstraintAdjustment::empty());
+        p.set_offset(shared.units(pos.0 - origin.0), shared.units(pos.1 - origin.1));
+        p
+    }
+
+    /// Asks for the popup to be where `pos` and `size` say now.
+    fn reposition(&self, link: &Link, id: u32) {
+        if let Some((_, popup)) = &*self.shown.borrow() {
+            let p = self.positioner(link);
+            let token = self.token.get().wrapping_add(1);
+            self.token.set(token);
+            link.shared.asked.borrow_mut().entry(id).or_default().push((token, self.pos.get()));
+            popup.reposition(&p, token);
+            p.destroy();
+        }
+    }
+
+    /// Whether `surface` may be shown, `size` units big. The first time
+    /// it makes the popup, which may be shown once the compositor answers.
+    fn ready(&self, link: &Link, surface: &WlSurface, size: Point) -> bool {
+        let id = surface.id().protocol_id();
+        if link.shared.dismissed.borrow_mut().remove(&id) {
+            self.hide(link, surface);
+        }
+        if self.shown.borrow().is_none() {
+            self.size.set(size);
+            let xdg = self.wm.get_xdg_surface(surface, &link.qh, id);
+            let p = self.positioner(link);
+            let popup = xdg.get_popup(Some(&self.parent), &p, &link.qh, id);
+            link.shared.asked.borrow_mut().remove(&id);
+            link.shared.placed.borrow_mut().insert(id, self.pos.get());
+            p.destroy();
+            self.configured.set(false);
+            *self.shown.borrow_mut() = Some((xdg, popup));
+            surface.commit();
+            let _ = link.conn.flush();
+            return false;
+        }
+        if self.size.get() != size {
+            self.size.set(size);
+            self.reposition(link, id);
+        }
+        if let Some(serial) = link.shared.configures.borrow_mut().remove(&id) {
+            if let Some((xdg, _)) = &*self.shown.borrow() {
+                xdg.ack_configure(serial);
+                self.configured.set(true);
+                // It moves with the commit that follows.
+                if let Some(at) = link.shared.placed.borrow_mut().remove(&id) {
+                    self.moving.set(Some(at));
+                }
+            }
+        }
+        if let (true, Some((xdg, _))) = (self.configured.get(), &*self.shown.borrow()) {
+            xdg.set_window_geometry(0, 0, size.0.max(1), size.1.max(1));
+        }
+        self.configured.get()
+    }
+
+    /// Takes the popup off the screen and unmakes it.
+    fn hide(&self, link: &Link, surface: &WlSurface) {
+        let Some((xdg, popup)) = self.shown.borrow_mut().take() else { return };
+        surface.attach(None, 0, 0);
+        surface.commit();
+        popup.destroy();
+        xdg.destroy();
+        link.shared.configures.borrow_mut().remove(&surface.id().protocol_id());
+        let _ = link.conn.flush();
+    }
+}
+
+/// A part of the main window: a popup of it, or a subsurface.
 pub struct Sub {
     link: Link,
     surface: WlSurface,
-    role: WlSubsurface,
+    role: Role,
     main: WlSurface,
     place: Rc<Place>,
 }
@@ -401,8 +691,17 @@ impl Sub {
 
     pub fn move_to(&self, pos: Point) {
         let Link { conn, qh, shared, .. } = &self.link;
+        let role = match &self.role {
+            Role::Sub(role) => role,
+            Role::Popup(popup) => {
+                popup.pos.set(pos);
+                popup.reposition(&self.link, self.id());
+                let _ = conn.flush();
+                return;
+            }
+        };
         let origin = shared.origin.get();
-        self.role.set_position(shared.units(pos.0 - origin.0), shared.units(pos.1 - origin.1));
+        role.set_position(shared.units(pos.0 - origin.0), shared.units(pos.1 - origin.1));
         // A subsurface moves when its parent is next shown.
         self.main.commit();
         self.place.sent.borrow_mut().push_back(pos);
@@ -418,7 +717,13 @@ impl Sub {
 impl Drop for Sub {
     fn drop(&mut self) {
         self.link.shared.places.borrow_mut().remove(&self.id());
-        self.role.destroy();
+        self.link.shared.dismissed.borrow_mut().remove(&self.id());
+        self.link.shared.placed.borrow_mut().remove(&self.id());
+        self.link.shared.asked.borrow_mut().remove(&self.id());
+        match &self.role {
+            Role::Sub(role) => role.destroy(),
+            Role::Popup(popup) => popup.hide(&self.link, &self.surface),
+        }
         self.surface.destroy();
         self.main.commit();
         let _ = self.link.conn.flush();
@@ -433,8 +738,10 @@ pub struct Shm {
     /// Sizes a subsurface in the compositor's units; winit does that for
     /// the main window.
     viewport: Option<WpViewport>,
-    /// A subsurface, not the main window.
+    /// A subsurface or popup, not the main window.
     sub: bool,
+    /// The popup it is, when it is one.
+    popup: Option<Rc<Popup>>,
     bufs: Vec<Buf>,
     /// The pixels the shape shows, for the size they were made for.
     shape: Option<(Point, Vec<bool>)>,
@@ -448,7 +755,7 @@ pub struct Shm {
 
 impl Shm {
     fn new(link: Link, surface: WlSurface, viewport: Option<WpViewport>, sub: bool) -> Shm {
-        Shm { link, surface, viewport, sub, bufs: Vec::new(), shape: None, input: None, input_changed: false, ready: sub }
+        Shm { link, surface, viewport, sub, popup: None, bufs: Vec::new(), shape: None, input: None, input_changed: false, ready: sub }
     }
 
     /// The main window may be drawn from now on.
@@ -478,6 +785,12 @@ impl Shm {
     pub fn present(&mut self, (w, h): Point, draw: impl FnOnce(&mut [u32])) {
         if !self.ready || w <= 0 || h <= 0 {
             return;
+        }
+        if let Some(popup) = &self.popup {
+            let units = (self.link.shared.units(w).max(1), self.link.shared.units(h).max(1));
+            if !popup.ready(&self.link, &self.surface, units) {
+                return;
+            }
         }
         let full = self.whole_units((w, h));
         let Some(i) = self.free_buf(full) else { return };
@@ -524,6 +837,10 @@ impl Shm {
     /// would be closing it.
     pub fn hide(&mut self, size: Point) {
         if !self.ready {
+            return;
+        }
+        if let Some(popup) = &self.popup {
+            popup.hide(&self.link, &self.surface);
             return;
         }
         if self.sub {
@@ -573,6 +890,16 @@ impl Shm {
             }
         }
         self.surface.commit();
+        // A popup that moves with this commit is there for the mouse once
+        // the compositor has taken it: what the mouse did before comes
+        // from where it was.
+        if let Some(at) = self.popup.as_ref().and_then(|p| p.moving.take()) {
+            let id = self.surface.id().protocol_id();
+            if let Some(place) = shared.places.borrow().get(&id) {
+                place.sent.borrow_mut().push_back(at);
+                conn.display().sync(qh, id);
+            }
+        }
         let _ = conn.flush();
     }
 

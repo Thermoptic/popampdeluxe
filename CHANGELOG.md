@@ -13,6 +13,14 @@ All notable changes to this project are documented here. The format follows
   inside the work area, so the windows further from the edge went on
   and slid over the held one, and the next drag started with the held
   window stuck at the edge. The group now stops as a whole.
+- **COSMIC:** Popamp runs there as a Wayland program, since COSMIC's
+  Xwayland does not let a program move its windows. The equalizer and
+  the playlist follow the mouse when dragged, even at the screen's edge,
+  and the main window changes size with the others (Ctrl+D). COSMIC
+  calls every floating window tiled, and winit then ignored the new
+  size; Popamp builds with a fork of winit that fixes this until the
+  fix ([winit#4847](https://github.com/rust-windowing/winit/pull/4847))
+  is released.
 
 ### Changed
 

@@ -19,7 +19,7 @@ libraries below are loaded at runtime, not linked at build time.
 
 | Library / tool | Required? | Used for |
 |---|---|---|
-| X11 server, XWayland or a Wayland compositor | **required** | windows (X11 where it runs, also on Wayland desktops; Wayland itself where it does not, or with `wayland=1` in `popamp.ini`) |
+| X11 server, XWayland or a Wayland compositor | **required** | windows (X11 where it runs, also on Wayland desktops; Wayland itself where it does not, on COSMIC, or with `wayland=1` in `popamp.ini`) |
 | `libasound.so.2` (ALSA) | **required** | audio output; on PipeWire/PulseAudio it goes through their ALSA `default` device |
 | `libX11`, `libX11-xcb`, `libxcb`, `libXcursor`, `libXi`, `libxkbcommon`, `libxkbcommon-x11` | **required** | windowing and keyboard (loaded with `dlopen`) |
 | `libwayland-client` | for Wayland | windows as a Wayland program (loaded with `dlopen`) |
