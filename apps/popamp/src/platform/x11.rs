@@ -32,13 +32,17 @@ pub fn attributes(role: WindowRole) -> WindowAttributes {
 }
 
 /// Picks the window system for the event loop: Wayland where the desktop
-/// is one and either the user asked for it (`wanted`) or X11 programs
-/// cannot run there; X11 otherwise, where Popamp can place its windows.
+/// is one and either the user asked for it (`wanted`), X11 programs
+/// cannot run there, or its XWayland does not let them place their
+/// windows (COSMIC); X11 otherwise, where Popamp can place its windows.
 pub fn choose_window_system<T>(builder: &mut winit::event_loop::EventLoopBuilder<T>, wanted: bool) {
     use winit::platform::wayland::EventLoopBuilderExtWayland as _;
     use winit::platform::x11::EventLoopBuilderExtX11 as _;
     let has = |var: &str| std::env::var_os(var).is_some_and(|v| !v.is_empty());
-    if has("WAYLAND_DISPLAY") && (wanted || !has("DISPLAY")) {
+    // cosmic-comp keeps a mapped X11 window where it is, whatever it asks
+    // for, so under XWayland the windows could not be dragged.
+    let cosmic = std::env::var("XDG_CURRENT_DESKTOP").is_ok_and(|d| d.split(':').any(|d| d.eq_ignore_ascii_case("COSMIC")));
+    if has("WAYLAND_DISPLAY") && (wanted || cosmic || !has("DISPLAY")) {
         builder.with_wayland();
     } else {
         builder.with_x11();

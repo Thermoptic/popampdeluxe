@@ -310,6 +310,9 @@ impl App {
                 pos = (monitors[0].x + 100, monitors[0].y + 100 + scale.px(k.index() as i32 * 116));
             }
         }
+        if wayland && k != WindowKey::Main {
+            pos = self.near_main(k, pos, monitors);
+        }
         let role = self.role(k);
         let mut attrs = platform::attributes(role)
             .with_title(crate::bind::title(k))
@@ -355,6 +358,34 @@ impl App {
         });
         self.store_pos(k, pos);
         true
+    }
+
+    /// Under Wayland, where the equalizer, the playlist and the library are
+    /// parts of the main window: one kept more than half a screen away from
+    /// it, as an X11 session or a stray drag may leave it, goes back against
+    /// it, since off the screen nothing could bring it back.
+    fn near_main(&self, k: WindowKey, pos: (i32, i32), monitors: &[Screen]) -> (i32, i32) {
+        let main = self.saved_pos(WindowKey::Main);
+        let screen = monitors.first().map_or((1920, 1080), |m| (m.w, m.h));
+        if (pos.0 - main.0).abs() <= screen.0 / 2 && (pos.1 - main.1).abs() <= screen.1 / 2 {
+            return pos;
+        }
+        let px = |k: WindowKey| {
+            let (w, h) = self.logical_size(k);
+            (self.scale(k).px(w), self.scale(k).px(h))
+        };
+        let (mw, mh) = px(WindowKey::Main);
+        let pos = match k {
+            WindowKey::Eq => (main.0, main.1 + mh),
+            // Under the equalizer, where it is shown.
+            WindowKey::Playlist => match self.win(WindowKey::Eq).filter(|_| self.wanted_visible(WindowKey::Eq)) {
+                Some(eq) => (eq.pos.0, eq.pos.1 + px(WindowKey::Eq).1),
+                None => (main.0, main.1 + mh),
+            },
+            _ => (main.0 + mw, main.1),
+        };
+        log::info!("Wayland: {k:?} was far from the main window, put back against it at {pos:?}");
+        pos
     }
 
     /// Minimizes or restores the windows. Where the system does that with
@@ -468,6 +499,7 @@ impl App {
             plan = self.plan(&old, anchor, bar);
         }
         let Plan { sizes, pos: new_pos } = plan;
+        let wayland = self.platform.on_wayland();
         for (i, &k) in WindowKey::ALL.iter().enumerate() {
             let visible = self.wanted_visible(k);
             let (lw, lh) = self.logical_size(k);
@@ -476,6 +508,13 @@ impl App {
             if let Some(w) = self.win_mut(k) {
                 let size = (scale.px(lw), scale.px(lh));
                 if let Some(top) = w.window.top() {
+                    // winit holds a window that cannot be resized by the
+                    // user to its first size under Wayland, as its least
+                    // and greatest size: those go along.
+                    if wayland {
+                        top.set_min_inner_size(Some(platform::size(size.0, size.1)));
+                        top.set_max_inner_size(Some(platform::size(size.0, size.1)));
+                    }
                     let _ = top.request_inner_size(platform::size(size.0, size.1));
                 }
                 if w.pos != pos {
@@ -1079,7 +1118,8 @@ impl App {
         let start = self.cursor_screen(k);
         // Windows lets a window past the work area's edges; X11 window
         // managers hold it inside.
-        let reach = if cfg!(windows) {
+        // Under Wayland nobody tells where the windows are on the monitors.
+        let reach = if cfg!(windows) || self.platform.on_wayland() {
             Reach::FREE
         } else {
             let rects: Vec<Rect> = group.iter().filter_map(|&g| self.rect(g)).collect();
@@ -1100,7 +1140,9 @@ impl App {
         let in_group = |k: WindowKey| group.iter().any(|(g, _)| *g == k);
         let mut targets: Vec<(i32, i32, i32, i32)> =
             WindowKey::ALL.iter().filter(|&&k| !in_group(k)).filter_map(|&k| self.rect(k)).collect();
-        if let Some(m) = self.main_monitor() {
+        // Not under Wayland, where the screen's edges are not known in the
+        // windows' positions.
+        if let Some(m) = self.main_monitor().filter(|_| !self.platform.on_wayland()) {
             let Screen { x: mx, y: my, w: mw, h: mh } = platform::monitor(&m);
             // Screen edges as zero-thickness rectangles around the monitor.
             targets.push((mx - 10_000, my - 10_000, 10_000 + mx + mw + 10_000 - mx, 10_000));
@@ -1148,10 +1190,17 @@ impl App {
                 let (sx, sy) = reach.clamp(sx, sy);
                 log::debug!(target: "moves", "drag {k:?}: cursor {cursor:?} (local {:?}), by ({dx},{dy}) snapped ({sx},{sy})", self.win(k).map(|w| w.cursor));
                 let (dx, dy) = (sx, sy);
+                let wayland = self.platform.on_wayland();
                 for (g, origin) in group {
                     let p = (origin.0 + dx, origin.1 + dy);
                     if let Some(w) = self.win_mut(g) {
                         if w.pos != p {
+                            // Under Wayland the mouse is known only from
+                            // the window: it stays where it is on the screen
+                            // as the window goes, as when a snap moves it.
+                            if wayland {
+                                w.cursor = (w.cursor.0 - (p.0 - w.pos.0), w.cursor.1 - (p.1 - w.pos.1));
+                            }
                             w.pos = p;
                             w.window.move_to(p);
                         }
