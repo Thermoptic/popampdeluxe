@@ -1082,7 +1082,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "dpi"
 version = "0.1.1"
-source = "git+https://github.com/popamp/winit?branch=popamp-0.30#d7278b4ca10a03930fec9cd16f975fb19ecd8afa"
+source = "git+https://github.com/popamp/winit?branch=popamp-0.30#492e4ef7b2a4527e5ede5c61c6a47476319e924e"
 
 [[package]]
 name = "dtor"
@@ -5755,7 +5755,7 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 [[package]]
 name = "winit"
 version = "0.30.13"
-source = "git+https://github.com/popamp/winit?branch=popamp-0.30#d7278b4ca10a03930fec9cd16f975fb19ecd8afa"
+source = "git+https://github.com/popamp/winit?branch=popamp-0.30#492e4ef7b2a4527e5ede5c61c6a47476319e924e"
 dependencies = [
  "ahash",
  "android-activity",
