@@ -44,6 +44,9 @@ All notable changes to this project are documented here. The format follows
   size; Popamp builds with a fork of winit that fixes this until the
   fix ([winit#4847](https://github.com/rust-windowing/winit/pull/4847))
   is released.
+- **COSMIC:** the main window dropped in a screen corner keeps its size
+  instead of being stretched to the quarter of the screen COSMIC tiles
+  it into.
 
 ### Changed
 
