@@ -1370,6 +1370,10 @@ impl Model {
                 let v = !self.settings().easymove;
                 self.settings_mut().easymove = v;
             }
+            C::ToggleGroupMove => {
+                let v = !self.settings().groupmove;
+                self.settings_mut().groupmove = v;
+            }
             C::ToggleWindowshade => {
                 let v = !self.settings().windowshade;
                 self.settings_mut().windowshade = v;
@@ -1617,6 +1621,7 @@ impl Model {
             MenuItem::cmd("Double Size", "Ctrl+D", C::ToggleDoubleSize).checked(s.dsize),
             MenuItem::sub("Size", self.size_menu()),
             MenuItem::cmd("EasyMove", "Ctrl+E", C::ToggleEasyMove).checked(s.easymove),
+            MenuItem::cmd("Move docked windows together", "", C::ToggleGroupMove).checked(s.groupmove),
             MenuItem::cmd("Windowshade", "Ctrl+W", C::ToggleWindowshade).checked(s.windowshade),
             MenuItem::sep(),
             MenuItem::cmd("Repeat", "R", C::ToggleRepeat).checked(s.repeat),

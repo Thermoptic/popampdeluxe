@@ -6,6 +6,29 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Toolbar mode as a Wayland program:** the bar is a layer of the
+  desktop where the compositor has wlr-layer-shell (COSMIC, KDE Plasma,
+  Sway, Hyprland), keeps maximized windows out of its strip and takes the
+  width the desktop's panels leave it. The equalizer and the playlist sit
+  against it as on X11. It takes no keys there.
+- **Snapping to the screen's edges on COSMIC:** the equalizer and the
+  playlist snap to the edges of the monitor as Popamp's windows do
+  elsewhere. COSMIC tells Popamp where its main window is
+  (cosmic-toplevel-info). The main window, which the compositor moves,
+  snaps with COSMIC's *Edge gravity* (Settings → Desktop → Window
+  management). They stop at the desktop's panels, not under them:
+  Popamp asks COSMIC how much room the panels leave on the monitor.
+- **Move docked windows together** (Options menu, off by default):
+  dragging the equalizer or the playlist by its title bar, while it is
+  docked to the main window, moves the whole docked group, which snaps
+  as one. On COSMIC the compositor moves the group, which then snaps
+  only with COSMIC's *Edge gravity*.
+- **COSMIC:** while the main window is dragged, the equalizer and the
+  playlist not docked to it are hidden, and come back where they were,
+  instead of going along with it.
+
 ### Fixed
 
 - **Dragging at a screen edge under X11:** docked windows stay together

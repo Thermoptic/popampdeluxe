@@ -111,6 +111,7 @@ cargo build --release                      # add --features plus for popamp-plus
 - [Usage](docs/usage.md): keys, remote control from the command line, where settings live.
 - [Building and installing](docs/building.md): requirements, packages per distribution, installing from source.
 - [Plug-ins](docs/plugins.md) and [the skin format](docs/skin-format.md), for making your own.
+- [Wayland and COSMIC](docs/wayland.md): what works as a Wayland program, on Pop!_OS in particular, and why some things cannot.
 - [Testing](docs/testing.md): what was tested, where and how.
 - [Contributing](CONTRIBUTING.md), [Changelog](CHANGELOG.md), [Roadmap](docs/ROADMAP.md).
 

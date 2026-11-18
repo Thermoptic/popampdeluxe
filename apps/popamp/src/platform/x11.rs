@@ -63,16 +63,22 @@ pub struct Platform {
     on_wayland: bool,
     /// There from the main window's making on.
     wayland: Option<Wayland>,
+    /// The Wayland compositor makes bars for programs.
+    layer_shell: bool,
+    /// winit's window the Wayland connection was joined with, kept while
+    /// the bar stands in for it.
+    host: Option<Arc<Window>>,
 }
 
 impl Platform {
     pub fn connect() -> Platform {
-        Platform { x11: None, on_wayland: false, wayland: None }
+        Platform { x11: None, on_wayland: false, wayland: None, layer_shell: false, host: None }
     }
 
     /// Finds which window system the event loop is on.
     pub fn start(&mut self, el: &ActiveEventLoop) {
         self.on_wayland = el.is_wayland();
+        self.layer_shell = self.on_wayland && wayland::has_layer_shell(el);
         if !self.on_wayland && self.x11.is_none() {
             self.x11 = x11rb::connect(None).map(|(c, _)| c).map_err(|e| log::warn!("no X11 connection for window shapes: {e}")).ok();
         }
@@ -82,9 +88,26 @@ impl Platform {
         self.on_wayland
     }
 
+    /// Whether the main window can be a bar: always but as a Wayland
+    /// program, where the compositor makes it.
+    pub fn can_bar(&self) -> bool {
+        !self.on_wayland || self.layer_shell
+    }
+
+    /// Whether a Wayland main window has been made.
+    pub fn joined(&self) -> bool {
+        self.wayland.is_some()
+    }
+
     /// What to draw `window` into. Under Wayland it is the main window,
     /// at `pos`, which the others are then placed against.
     pub fn surface(&mut self, window: &Arc<Window>, pos: (i32, i32)) -> Result<Surface, String> {
+        if let Some(wayland) = &mut self.wayland {
+            wayland.rejoin(window, pos)?;
+            self.host = Some(window.clone());
+            return Ok(Surface::Shm(Box::new(wayland.main_surface())));
+        }
+        self.host = Some(window.clone());
         match Wayland::join(window, pos) {
             Some(joined) => {
                 let wayland = joined?;
@@ -101,6 +124,31 @@ impl Platform {
     pub fn child(&self, pos: (i32, i32), input: bool) -> Option<(Win, Surface)> {
         let (sub, shm) = self.wayland.as_ref()?.sub(pos, input);
         Some((Win::Sub(Box::new(sub)), Surface::Shm(Box::new(shm))))
+    }
+
+    /// Under Wayland, the bar at `edge`, `size` screen pixels big at `pos`,
+    /// for the main window made before, which goes off the screen. The
+    /// windows made by `child` from now on are parts of the bar.
+    pub fn bar(&mut self, edge: BarEdge, pos: (i32, i32), size: (i32, i32)) -> Option<(Win, Surface)> {
+        let (sub, shm) = self.wayland.as_mut().filter(|w| w.has_bar())?.bar(edge, pos, size)?;
+        Some((Win::Sub(Box::new(sub)), Surface::Shm(Box::new(shm))))
+    }
+
+    /// The width of the bar made by `bar`, once the compositor has given it.
+    pub fn bar_width(&self) -> Option<i32> {
+        self.wayland.as_ref()?.bar_width()
+    }
+
+    /// Under Wayland, the monitors placed against the main window, where
+    /// the compositor tells where it is.
+    pub fn wayland_monitors(&self) -> Vec<Screen> {
+        self.wayland.as_ref().map(Wayland::monitors).unwrap_or_default()
+    }
+
+    /// Under Wayland, has the compositor move the main window as a button
+    /// pressed over one of its parts is held; false where it cannot.
+    pub fn drag_main(&self) -> bool {
+        self.wayland.as_ref().is_some_and(Wayland::drag_main)
     }
 
     /// What happened to the windows made by `child`.

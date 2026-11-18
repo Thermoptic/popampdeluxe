@@ -44,7 +44,11 @@ ksni = { version = "0.3", default-features = false, features = ["async-io", "blo
 # (see platform/wayland.rs). The versions winit and softbuffer use.
 wayland-client = "0.31"
 wayland-backend = { version = "0.3", features = ["client_system"] }
-wayland-protocols = { version = "0.32", features = ["client", "unstable"] }
+wayland-protocols = { version = "0.32", features = ["client", "unstable", "staging"] }
+# Where COSMIC has the main window (protocols/, from cosmic-protocols).
+wayland-scanner = "0.31"
+# The bar: a layer of the desktop (wlr-layer-shell), as panels are.
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
 wayland-cursor = "0.31"
 # winit's toolkit, for the xdg_surface of its main window that the menus,
 # the equalizer and the playlist are popups of.

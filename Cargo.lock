@@ -3069,6 +3069,8 @@ dependencies = [
  "wayland-client",
  "wayland-cursor",
  "wayland-protocols",
+ "wayland-protocols-wlr",
+ "wayland-scanner",
  "windows",
  "windows-sys 0.61.2",
  "winit",
