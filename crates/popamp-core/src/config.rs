@@ -205,6 +205,9 @@ settings! {
     snap: bool = true,
     snaplen: i32 = 10,
     easymove: bool = true,
+    /// Dragging the equalizer or the playlist by its title bar, while docked
+    /// to the main window, moves all the docked windows together.
+    groupmove: bool = false,
     aot: bool = false,
     /// Windows drawn at `zoom` instead of 1x ("Double Size", Ctrl+D).
     dsize: bool = false,
