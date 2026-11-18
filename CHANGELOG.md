@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Title-bar shortcuts** (Preferences > Shortcuts): choose what a right
+  or middle click on the title bar of the main, equalizer or playlist
+  window does (the part that drags the window, full size or shaded):
+  previous or next track, pause, stop, shuffle or repeat on/off. For
+  example, a middle click on the equalizer window pauses. A right click
+  with a shortcut set runs it instead of opening the menu.
 - **A `skins` folder beside the program:** any `.wsz` skin put there shows
   up in the Skin browser and the Skins menu. The Skin browser looks at the
   folders again while it is open, so a skin dropped in appears at once.

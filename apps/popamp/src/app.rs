@@ -16,6 +16,7 @@ use crate::ui::{Input, Out};
 use crate::widgets::{self, Event};
 use popamp_audio::PlayState;
 use popamp_core::config::BarEdge;
+use crate::shortcuts::{self, Click};
 use popamp_core::Command;
 use popamp_skin::layout::{Dim, Mode, Paint, Placement, Shape, WindowKey};
 use popamp_skin::textcfg::region_mask;
@@ -1372,6 +1373,15 @@ impl App {
             self.popups.clear();
             return;
         }
+        if let Some(click) = match button {
+            MouseButton::Right => Some(Click::Right),
+            MouseButton::Middle => Some(Click::Middle),
+            _ => None,
+        } {
+            if self.title_shortcut(el, k, click) {
+                return;
+            }
+        }
         if button != MouseButton::Left && button != MouseButton::Right {
             return;
         }
@@ -1395,6 +1405,19 @@ impl App {
         let input = self.input(k, right, double);
         let out = self.skins[k.index()].mouse_down(&mut self.model, &input);
         self.handle_out(el, k, out);
+    }
+
+    /// A right or middle click on a title bar runs what Preferences >
+    /// Shortcuts says for it. Returns whether it did; the right button then
+    /// opens no menu.
+    fn title_shortcut(&mut self, el: &ActiveEventLoop, k: WindowKey, click: Click) -> bool {
+        let Some(command) = shortcuts::find(&self.model.settings().title_shortcuts, k, click) else { return false };
+        let at = self.input(k, false, false);
+        if !self.skins[k.index()].on_title(&self.model, at.x, at.y) {
+            return false;
+        }
+        self.run(el, command);
+        true
     }
 
     fn mouse_up(&mut self, el: &ActiveEventLoop, k: WindowKey) {
