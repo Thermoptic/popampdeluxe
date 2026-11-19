@@ -120,9 +120,9 @@
     Type): the library window as a folder tree that reads file names, not
     tags: added folders on the left, an Explorer-like list on the right
     (Title and Date modified, sortable).
-  - Custom Skin Bmp Font (Preferences > Interface): the playlist, library,
+  - Custom Skin Bmp Font (Preferences > Font): the playlist, library,
     menus and dialogs written with the letters of the skin's `text.bmp`.
-  - Custom font (Preferences > Interface): any TrueType or OpenType font
+  - Custom font (Preferences > Font): any TrueType or OpenType font
     from the `fonts` folder beside the program for the playlist, the
     library, menus, dialogs and a vector skin's texts, at a size you type.
   - Title-bar shortcuts (Preferences > Shortcuts): a right or middle click

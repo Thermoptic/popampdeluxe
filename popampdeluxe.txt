@@ -61,7 +61,7 @@
   2026-11-19   CUSTOM FONT
   ..........................................................................
 
-  Preferences > Interface
+  Preferences > Font
 
   Draw the text of the player with a font of your own. Tick "Custom font",
   choose a font from the drop-down list, and type the size you want in the
@@ -89,8 +89,8 @@
 
   Custom Skin Bmp Font
 
-  Under Custom font there is a second choice: "Custom Skin Bmp Font". It
-  writes the same texts with the letters the skin itself uses for its
+  At the top of the page there is a second choice: "Custom Skin Bmp Font".
+  It writes the same texts with the letters the skin itself uses for its
   small displays: the pixel lettering in the skin's Text.bmp picture,
   as in the main window of a classic skin. With the Winamp Classic Amber
   skin the playlist, the menus and the dialogs then look like the player.

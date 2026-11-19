@@ -555,7 +555,7 @@ impl Section {
     fn label(self) -> &'static str {
         match self {
             Section::Windows => "Windows",
-            Section::Interface => "Interface",
+            Section::Interface => "Font",
             Section::Playlist => "Playlist",
             Section::Playback => "Playback",
             Section::Library => "Media Library",
@@ -570,7 +570,7 @@ impl Section {
             Section::Windows => {
                 &[Flag::Snap, Flag::EasyMove, Flag::KeepOnScreen, Flag::AlwaysOnTop, Flag::DoubleSize, Flag::SkinCursors, Flag::ScrollTitle]
             }
-            Section::Interface => &[Flag::CustomFont, Flag::SkinBmpFont],
+            Section::Interface => &[Flag::SkinBmpFont, Flag::CustomFont],
             Section::Playlist => &[Flag::DimInactive, Flag::ShowNumbers, Flag::ZeroPad],
             Section::Playback => &[Flag::AutoAdvance, Flag::KeepScanOpen],
             Section::Library => &[Flag::EnqueueDefault],
