@@ -430,12 +430,19 @@ impl FolderTree {
                 let cell = rect(x, row.y, w, row.h);
                 match by {
                     SortBy::Name => {
-                        // A folder has a small folder in front of its name.
-                        let icon = pen.px as i32 + 4;
+                        // A folder has a small folder in front of its name, a
+                        // song a small ball under the folder's middle.
+                        let icon = pen.px as i32 + 6;
+                        let fx = cell.x + 5;
                         if e.dir && !e.up {
-                            let (fx, fy) = (cell.x + 3, row.y + (row.h - 6) / 2);
+                            let fy = row.y + (row.h - 6) / 2;
                             pen.b.fill(fx, fy, 3, 1, color);
                             pen.b.fill(fx, fy + 1, 8, 5, color);
+                        } else if !e.dir {
+                            let by = row.y + (row.h - 5) / 2;
+                            pen.b.fill(fx + 3, by, 3, 1, color);
+                            pen.b.fill(fx + 2, by + 1, 5, 3, color);
+                            pen.b.fill(fx + 3, by + 4, 3, 1, color);
                         }
                         pen.left(rect(cell.x + icon, cell.y, (cell.w - icon).max(0), cell.h), &e.name, color);
                     }
@@ -841,6 +848,28 @@ mod tests {
         assert_eq!(std::fs::read_to_string(m.paths.foldertree_file()).unwrap().trim(), "");
         let menu = m.library_menu();
         assert!(menu.iter().any(|i| format!("{i:?}").contains("Add folder")));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn a_folder_has_a_folder_icon_and_a_song_a_ball_in_front_of_its_name() {
+        let (root, t) = music("icons");
+        let m = crate::model::Model::for_tests();
+        let mut fonts = crate::font::Fonts::for_skin(&m.skin);
+        let mut bitmap = popamp_skin::Bitmap::new(R.w, R.h, 0);
+        t.draw(&mut Canvas::new(&mut bitmap, crate::scale::Scale::ONE), &mut fonts.list, AT, &m.skin.pl, true, None);
+        let p = Parts::new(AT, false);
+        let (x0, bg, ink) = (p.table.rows.x, m.skin.pl.normal_bg, m.skin.pl.normal);
+        let at = |x: i32, y: i32| bitmap.get(x, y).unwrap();
+        // The folder row: its icon starts five pixels in; nothing is drawn at three and four.
+        let (fy, mid) = (p.table.rows.y + (p.row_h - 6) / 2, p.table.rows.y + p.row_h / 2);
+        assert_eq!((at(x0 + 3, mid), at(x0 + 4, mid)), (bg, bg));
+        assert_eq!((at(x0 + 5, fy + 3), at(x0 + 12, fy + 3)), (ink, ink), "the folder is 8 wide");
+        // The song row: a ball, centred under the folder's middle, 5 across.
+        let (row, by) = (p.table.rows.y + p.row_h, p.table.rows.y + p.row_h + (p.row_h - 5) / 2);
+        assert_eq!((at(x0 + 7, row + p.row_h / 2), at(x0 + 11, row + p.row_h / 2)), (ink, ink), "5 across at the middle");
+        assert_eq!((at(x0 + 6, row + p.row_h / 2), at(x0 + 12, row + p.row_h / 2)), (bg, bg));
+        assert_eq!((at(x0 + 9, by), at(x0 + 9, by + 4), at(x0 + 7, by), at(x0 + 11, by)), (ink, ink, bg, bg), "round: no corners");
         let _ = std::fs::remove_dir_all(root);
     }
 
