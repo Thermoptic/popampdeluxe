@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Copy to clipboard** (playlist menu): the right-click menu of the
+  playlist window has *Copy to clipboard*, which puts every file in the
+  playlist on the clipboard as files to copy. Ctrl+V in a folder of Windows
+  Explorer then copies them there. Web addresses and files that are gone
+  are left out. On Windows only; the entry is there on other systems too,
+  and says so when pressed.
 - **Media Library Foldertree** (Preferences > Media Library > Media Library
   Type): the Media Library window can be a folder tree instead of the tag
   library. Choose *Media Library id3* (the default) or *Media Library

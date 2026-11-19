@@ -1235,6 +1235,7 @@ impl Model {
             C::JumpToFile => self.ui.push(UiReq::Panel(PanelKind::JumpToFile)),
             C::FileInfo => self.ui.push(UiReq::Panel(PanelKind::FileInfo)),
             C::PlGenerateHtml => self.request_dialog(DialogKind::SaveHtml),
+            C::PlCopyToClipboard => self.copy_playlist_to_clipboard(),
             C::EqLoadDefault => {
                 let p = self.settings().eq_default();
                 self.apply_preset(&p);
@@ -1784,9 +1785,27 @@ impl Model {
             MenuItem::cmd("Playlist entry…", "Ctrl+E", C::EditPlaylistEntry),
             MenuItem::cmd("Bookmark item(s)", "Alt+I", C::BookmarkSelected),
             MenuItem::cmd("Scan ReplayGain", "", C::ScanReplayGain),
+            MenuItem::cmd("Copy to clipboard", "", C::PlCopyToClipboard),
             MenuItem::sep(),
             MenuItem::sub("Sort", self.sort_menu()),
         ]
+    }
+
+    /// Puts every file in the playlist on the clipboard, as files to paste
+    /// in a folder of the file manager. Web addresses have no file to copy.
+    pub fn copy_playlist_to_clipboard(&mut self) {
+        let files: Vec<PathBuf> =
+            self.playlist.entries().iter().filter(|e| !is_url(&e.location)).map(|e| PathBuf::from(&e.location)).filter(|p| p.is_file()).collect();
+        if files.is_empty() {
+            return self.flash("NO FILES IN THE PLAYLIST TO COPY");
+        }
+        match crate::clipboard::copy_files(&files) {
+            Ok(()) => self.flash(if files.len() == 1 { "COPIED 1 FILE TO THE CLIPBOARD".to_string() } else { format!("COPIED {} FILES TO THE CLIPBOARD", files.len()) }),
+            Err(e) => {
+                log::warn!("cannot copy to the clipboard: {e}");
+                self.flash(format!("CLIPBOARD: {}", e.to_uppercase()));
+            }
+        }
     }
 
     /// The playlist's MISC > Misc options menu.

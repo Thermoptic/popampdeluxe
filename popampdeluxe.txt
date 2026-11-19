@@ -21,6 +21,21 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-19   COPY THE PLAYLIST'S FILES TO THE CLIPBOARD
+  ..........................................................................
+
+  Right-click in the Playlist window > Copy to clipboard
+
+  Puts every song in the playlist on the clipboard, as files, the way
+  Windows Explorer does when you copy them. Then open a folder in Explorer
+  and press Ctrl+V: the songs are copied into the folder.
+
+     * All the songs in the playlist are copied, not only the selected.
+     * Web addresses and files that no longer exist are left out.
+     * A message in the player says how many files were copied.
+     * Windows only.
+
+
   2026-11-19   MEDIA LIBRARY FOLDERTREE
   ..........................................................................
 

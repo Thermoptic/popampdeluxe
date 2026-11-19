@@ -8,6 +8,7 @@ mod app;
 mod bar;
 mod bind;
 mod canvas;
+mod clipboard;
 mod cli;
 mod dialogs;
 mod edition;

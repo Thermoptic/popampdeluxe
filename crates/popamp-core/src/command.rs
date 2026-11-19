@@ -126,6 +126,7 @@ commands! {
     LibraryOpenOther = 50040,
     ToggleGroupMove = 50041,
     ToggleLibraryShade = 50042,
+    PlCopyToClipboard = 50043,
 }
 
 #[cfg(test)]

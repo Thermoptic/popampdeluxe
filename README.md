@@ -5,6 +5,9 @@
 *Updated 2026-11-19. The same list, as a text file that comes with every
 download: [popampdeluxe.txt](popampdeluxe.txt).*
 
+- **Copy to clipboard** (right-click in the playlist, Windows). Every song in
+  the playlist is copied to the clipboard as files; press Ctrl+V in an
+  Explorer folder to copy them there.
 - **Media Library Foldertree** (Preferences > Media Library). A second kind
   of library window: add folders on the left, browse them like Explorer on
   the right, by file name, sorted by title or date.

@@ -116,6 +116,8 @@
     even when the icon is otherwise off. On Linux, notifications of each
     new track with its cover, off by default. Both are in Preferences >
     Desktop.
+  - Copy to clipboard (playlist right-click menu, Windows): every file in the
+    playlist goes on the clipboard, to paste in Explorer with Ctrl+V.
   - Media Library Foldertree (Preferences > Media Library > Media Library
     Type): the library window as a folder tree that reads file names, not
     tags: added folders on the left, an Explorer-like list on the right
