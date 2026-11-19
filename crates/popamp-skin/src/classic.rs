@@ -449,22 +449,22 @@ fn pl_overlay(src: Rect) -> Look {
 }
 
 fn playlist_shade() -> Mode {
-    shade_bar(Command::TogglePlShade, Command::TogglePlaylistWindow, Text::Title)
+    shade_bar(Command::TogglePlShade, Command::TogglePlaylistWindow, Some(Text::Title))
 }
 
 /// The playlist editor's windowshade strip, for it and the library: it
-/// shows `title`, a double click or the shade button runs `shade` and the
-/// close button runs `close`.
-fn shade_bar(shade: Command, close: Command, title: Text) -> Mode {
-    let v = vec![
+/// shows `title` when it has one, a double click or the shade button runs
+/// `shade` and the close button runs `close`.
+fn shade_bar(shade: Command, close: Command, title: Option<Text>) -> Mode {
+    let mut v = vec![
         piece(Start(0), Start(0), pair_look(p::SHADE_LEFT), 25, 14),
         tiles(span(Start(25), Start(0), End(-50), Start(14)), p::SHADE_TILE),
         piece(End(-50), Start(0), pair_look(p::SHADE_RIGHT), 50, 14),
         Element::new(span(Start(0), Start(0), End(0), Start(14)), Kind::Drag { double: Some(shade) }),
         button(span(End(-21), Start(3), End(-12), Start(12)), pl_overlay(p::SHADE_PRESSED), Action::click(shade)).cursor(C::PWinBut),
         button(span(End(-11), Start(3), End(-2), Start(12)), pl_overlay(p::CLOSE_PRESSED), Action::click(close)).cursor(C::PClose),
-        Element::new(span(Start(5), Start(4), End(-55), Start(10)), Kind::Text(title)),
     ];
+    v.extend(title.map(|t| Element::new(span(Start(5), Start(4), End(-55), Start(10)), Kind::Text(t))));
     Mode { width: Dim::Free { min: p::MIN_SIZE.0, step: p::STEP.0 }, height: Dim::Fixed(14), cursor: C::PWSNorm, elements: v, shape: None }
 }
 
@@ -526,7 +526,6 @@ fn library_window() -> WindowDef {
             Kind::Image { look: pair_look(p::TOP_TILE), fill: Fill::Tile, lit: None },
         ),
         piece(End(-25), Start(0), pair_look(p::TOP_RIGHT), 25, 20),
-        Element::new(span(Center(-33), Start(7), Center(32), Start(13)), Kind::Text(Text::LibraryTitle)),
         tiles(span(Start(0), Start(20), Start(12), End(-38)), p::LEFT_TILE),
         tiles(span(End(-20), Start(20), End(0), End(-38)), p::RIGHT_TILE),
         tiles(span(Start(12), End(-38), End(-150), End(0)), p::BOTTOM_TILE),
@@ -569,9 +568,9 @@ fn library_window() -> WindowDef {
 }
 
 /// The library's windowshade strip, which a skin that draws the library
-/// window itself and gives it none gets.
+/// window itself and gives it none gets. It says nothing: no title.
 pub(crate) fn library_shade() -> Mode {
-    shade_bar(Command::ToggleLibraryShade, Command::ToggleLibraryWindow, Text::LibraryTitle)
+    shade_bar(Command::ToggleLibraryShade, Command::ToggleLibraryWindow, None)
 }
 
 /// The small transport buttons drawn in the playlist frame's bottom right.
@@ -696,6 +695,18 @@ mod tests {
             assert!(matches!(hit(pl, w, h, w - 11, 40).unwrap().kind, Kind::ListScroll { .. }));
             assert!(matches!(hit(pl, w, h, w - 40, h - 20).unwrap().kind, Kind::Popup { .. }), "LIST button");
         }
+    }
+
+    #[test]
+    fn the_library_window_has_no_title_text_in_either_size() {
+        let l = layout(433, 433);
+        let def = l.window(WindowKey::Library).unwrap();
+        for mode in [&def.normal, def.shade.as_ref().unwrap()] {
+            assert!(!mode.elements.iter().any(|e| matches!(e.kind, Kind::Text(Text::LibraryTitle))), "the title bar is left empty");
+        }
+        // The playlist's strip still shows the song.
+        let pl = l.window(WindowKey::Playlist).unwrap().shade.as_ref().unwrap();
+        assert!(pl.elements.iter().any(|e| matches!(e.kind, Kind::Text(Text::Title))));
     }
 
     #[test]
