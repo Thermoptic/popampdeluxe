@@ -394,11 +394,18 @@ impl FolderTree {
         for &(by, x, w) in &cols {
             let cell = rect(x, t.header.y, w, t.header.h);
             let text = Self::heading(by);
-            pen.left(cell, text, pen.dim);
-            // An arrow after the name of the column the list is ordered by: up for A to Z or oldest first.
+            // The date sits at the right edge, whatever the width of the window.
+            if by == SortBy::Date {
+                pen.right(cell, text, pen.dim);
+            } else {
+                pen.left(cell, text, pen.dim);
+            }
+            // An arrow by the name of the column the list is ordered by: up for A to Z or oldest first.
+            // After a name at the left, before the date's name at the right, which stays where it is.
             if let Some((_, reverse)) = self.sort.filter(|s| s.0 == by) {
                 let up = reverse == (by == SortBy::Date);
-                let ax = (x + 6 + pen.width(text)).min(x + w - 6);
+                let tw = pen.width(text);
+                let ax = if by == SortBy::Date { (x + w - 10 - tw).max(x + 1) } else { (x + 6 + tw).min(x + w - 6) };
                 let mid = t.header.y + t.header.h / 2;
                 for k in 0..3 {
                     let y = if up { mid + 1 - k } else { mid - 1 + k };
@@ -446,7 +453,7 @@ impl FolderTree {
                         }
                         pen.left(rect(cell.x + icon, cell.y, (cell.w - icon).max(0), cell.h), &e.name, color);
                     }
-                    SortBy::Date => pen.left(cell, &e.modified.map(date_text).unwrap_or_default(), pen.dim),
+                    SortBy::Date => pen.right(cell, &e.modified.map(date_text).unwrap_or_default(), pen.dim),
                 }
             }
             if n == self.cursor && active && self.focus.unwrap_or(List::Tracks) == List::Tracks {
@@ -870,6 +877,40 @@ mod tests {
         assert_eq!((at(x0 + 7, row + p.row_h / 2), at(x0 + 11, row + p.row_h / 2)), (ink, ink), "5 across at the middle");
         assert_eq!((at(x0 + 6, row + p.row_h / 2), at(x0 + 12, row + p.row_h / 2)), (bg, bg));
         assert_eq!((at(x0 + 9, by), at(x0 + 9, by + 4), at(x0 + 7, by), at(x0 + 11, by)), (ink, ink, bg, bg), "round: no corners");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn the_dates_and_their_heading_are_flush_right_whatever_the_width() {
+        let (root, t) = music("right");
+        let m = crate::model::Model::for_tests();
+        let mut fonts = crate::font::Fonts::for_skin(&m.skin);
+        // The rightmost drawn pixel of a row, between its name column's end and the scroll bar.
+        let mut reach = |width: i32, row: usize, head: bool| {
+            let at = Place { r: rect(0, 0, width, 300), ..AT };
+            let mut b = popamp_skin::Bitmap::new(width, 300, 0);
+            t.draw(&mut Canvas::new(&mut b, crate::scale::Scale::ONE), &mut fonts.list, at, &m.skin.pl, true, None);
+            let p = Parts::new(at, false);
+            let y = if head { p.table.header.y } else { p.table.rows.y + row as i32 * p.row_h };
+            let h = if head { p.table.header.h - 2 } else { p.row_h };
+            let right = p.table.rows.x + p.table.rows.w;
+            let bg = m.skin.pl.normal_bg;
+            let mut best = 0;
+            for yy in y..y + h {
+                for x in (right - 40)..right {
+                    if b.get(x, yy).is_some_and(|p| p != bg) {
+                        best = best.max(x);
+                    }
+                }
+            }
+            (best, right)
+        };
+        for width in [500, 640] {
+            let (row, right) = reach(width, 1, false);
+            assert!(row >= right - 5 && row < right, "{width}: a date ends at the right edge, not {} short", right - row);
+            let (head, right) = reach(width, 0, true);
+            assert!(head >= right - 5 && head < right, "{width}: so does its heading");
+        }
         let _ = std::fs::remove_dir_all(root);
     }
 
