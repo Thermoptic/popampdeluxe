@@ -283,6 +283,10 @@ settings! {
     font_file: String = String::new(),
     /// The custom font's size in pixels, for the playlist and the library.
     font_size: i32 = 12,
+    /// Draw the text of the player with the letters of the skin's `text.bmp`,
+    /// as the skin writes its small texts; the characters it lacks come from
+    /// the other fonts.
+    skin_bmp_font: bool = false,
     /// What a right or middle click on a window's title bar does, as
     /// `window:button:action` rules joined by `;` (Preferences > Shortcuts).
     title_shortcuts: String = String::new(),
@@ -319,10 +323,10 @@ settings! {
 
 impl Settings {
     /// Brings every value into its allowed range.
-    /// The size of the playlist's and the library's text: the custom
-    /// font's, when there is one.
+    /// The size of the playlist's and the library's text: the size chosen
+    /// for a custom font or the skin's own letters, when there is one.
     pub fn list_font_px(&self) -> i32 {
-        if self.custom_font {
+        if self.custom_font || self.skin_bmp_font {
             self.font_size
         } else {
             self.pe_fontsize

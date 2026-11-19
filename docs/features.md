@@ -116,6 +116,8 @@
     even when the icon is otherwise off. On Linux, notifications of each
     new track with its cover, off by default. Both are in Preferences >
     Desktop.
+  - Custom Skin Bmp Font (Preferences > Interface): the playlist, library,
+    menus and dialogs written with the letters of the skin's `text.bmp`.
   - Custom font (Preferences > Interface): any TrueType or OpenType font
     from the `fonts` folder beside the program for the playlist, the
     library, menus, dialogs and a vector skin's texts, at a size you type.

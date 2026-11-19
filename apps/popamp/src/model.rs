@@ -327,6 +327,12 @@ impl Model {
         std::fs::read(path).map_err(|e| log::warn!("cannot read font {}: {e}", s.font_file)).ok()
     }
 
+    /// The fonts the windows draw with: the skin's, or the user's own.
+    pub fn make_fonts(&self) -> crate::font::Fonts {
+        let letters = self.settings().skin_bmp_font.then(|| self.skin.sheet(popamp_skin::Sheet::Text));
+        crate::font::Fonts::new(&self.skin, self.custom_font().as_deref(), letters)
+    }
+
     pub fn settings(&self) -> &Settings {
         &self.config.settings
     }

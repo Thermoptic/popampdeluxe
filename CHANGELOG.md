@@ -8,6 +8,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Custom Skin Bmp Font** (Preferences > Interface): draws the text of
+  the player, in the playlist, the library, menus and dialogs, with the
+  letters of the skin's `text.bmp`, the same ones the skin writes its small
+  texts with. They are drawn as the skin made them up to size 15 and doubled
+  from size 16; the size box beside *Custom font* sets it. A character the
+  bitmap has no letter for (Cyrillic, say) comes from the usual font. Can be
+  used with or without *Custom font*. Setting `skin_bmp_font`.
 - **A custom font** (Preferences > Interface): tick *Custom font*, pick a
   `.ttf`, `.otf` or `.ttc` file from the `fonts` folder next to the program
   (or the one in your user data folder) and type a size. The font draws the

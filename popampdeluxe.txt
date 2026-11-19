@@ -50,6 +50,20 @@
   If the chosen font file is taken away, Popamp shows it as "(not found)"
   and uses its usual font until you choose another.
 
+  Custom Skin Bmp Font
+
+  Under Custom font there is a second choice: "Custom Skin Bmp Font". It
+  writes the same texts with the letters the skin itself uses for its
+  small displays: the pixel lettering in the skin's Text.bmp picture,
+  as in the main window of a classic skin. With the Winamp Classic Amber
+  skin the playlist, the menus and the dialogs then look like the player.
+
+     * The letters are drawn as the skin made them for sizes up to 15,
+       and twice as big from size 16 (the Size box sets it).
+     * Characters the picture has no letter for, such as Cyrillic, are
+       written with the usual font instead.
+     * It can be used on its own or together with Custom font.
+
 
   2026-11-19   WINDOWSHADE FOR THE MEDIA LIBRARY
   ..........................................................................

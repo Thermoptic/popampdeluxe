@@ -337,6 +337,7 @@ pub enum Flag {
     ShowNumbers,
     ZeroPad,
     CustomFont,
+    SkinBmpFont,
     AutoAdvance,
     TrayIcon,
     MinimizeToTray,
@@ -361,6 +362,7 @@ impl Flag {
             Flag::ShowNumbers => "Show playlist numbers",
             Flag::ZeroPad => "Zero-pad numbers",
             Flag::CustomFont => "Custom font",
+            Flag::SkinBmpFont => "Custom Skin Bmp Font",
             Flag::AutoAdvance => "Advance to next track",
             Flag::TrayIcon => "Icon in the system tray",
             Flag::MinimizeToTray => "Minimize to the tray",
@@ -398,6 +400,7 @@ impl Flag {
             Flag::ShowNumbers => &mut s.shownumsinpl,
             Flag::ZeroPad => &mut s.zeropadplnum,
             Flag::CustomFont => &mut s.custom_font,
+            Flag::SkinBmpFont => &mut s.skin_bmp_font,
             Flag::AutoAdvance => &mut s.pladv,
             Flag::TrayIcon => &mut s.tray_icon,
             Flag::MinimizeToTray => &mut s.minimize_to_tray,
@@ -425,7 +428,7 @@ impl Flag {
             Some(c) => model.exec(c),
             None => *self.slot(model.settings_mut()) = on,
         }
-        if matches!(self, Flag::SkinCursors | Flag::CustomFont) {
+        if matches!(self, Flag::SkinCursors | Flag::CustomFont | Flag::SkinBmpFont) {
             model.ui.push(UiReq::SkinChanged);
         }
         model.pl_dirty += 1;
@@ -565,7 +568,7 @@ impl Section {
             Section::Windows => {
                 &[Flag::Snap, Flag::EasyMove, Flag::KeepOnScreen, Flag::AlwaysOnTop, Flag::DoubleSize, Flag::SkinCursors, Flag::ScrollTitle]
             }
-            Section::Interface => &[Flag::CustomFont],
+            Section::Interface => &[Flag::CustomFont, Flag::SkinBmpFont],
             Section::Playlist => &[Flag::DimInactive, Flag::ShowNumbers, Flag::ZeroPad],
             Section::Playback => &[Flag::AutoAdvance, Flag::KeepScanOpen],
             Section::Library => &[Flag::EnqueueDefault],
@@ -823,7 +826,8 @@ impl Preferences {
             }
         }
         model.settings_mut().sanitize();
-        if model.settings().custom_font && (model.settings().font_file.clone(), model.settings().font_size) != (was_file, was_size) {
+        let own = model.settings().custom_font || model.settings().skin_bmp_font;
+        if own && (model.settings().font_file.clone(), model.settings().font_size) != (was_file, was_size) {
             model.ui.push(UiReq::SkinChanged);
         }
         model.push_engine_settings();
@@ -1296,6 +1300,21 @@ pub(crate) mod tests {
         let r = reach(p, m, i);
         click(p, m, r);
         click(p, m, Rect::new(r.x, r.y + r.h + 2 + n * ROW_H + 1, 1, 1));
+    }
+
+    #[test]
+    fn the_skins_own_letters_are_a_choice_of_the_interface_page() {
+        let mut m = songs(&[]);
+        let mut p = Panel::open(PanelKind::Preferences, &m);
+        assert!(!m.settings().skin_bmp_font);
+        assert_eq!(m.settings().list_font_px(), 10);
+        let r = check_box(&mut p, &mut m, Flag::SkinBmpFont);
+        click(&mut p, &mut m, r);
+        assert!(m.settings().skin_bmp_font && !m.settings().custom_font, "a choice of its own");
+        assert!(m.ui.iter().any(|r| matches!(r, UiReq::SkinChanged)), "the windows redraw with it");
+        assert_eq!(m.settings().list_font_px(), 12, "the size box is the playlist's size now");
+        let Panel::Prefs(pr) = &p else { unreachable!() };
+        assert_eq!(pr.form.page_of(check_index(&p, Flag::SkinBmpFont)), pr.form.page_of(check_index(&p, Flag::CustomFont)));
     }
 
     #[test]

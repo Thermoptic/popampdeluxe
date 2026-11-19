@@ -7,7 +7,8 @@ download: [popampdeluxe.txt](popampdeluxe.txt).*
 
 - **A custom font** (Preferences > Interface). Pick any `.ttf` or `.otf`
   from the `fonts` folder and a size, for the playlist, library, menus and
-  dialogs.
+  dialogs, or tick *Custom Skin Bmp Font* to write them with the letters of
+  the skin's own `text.bmp`.
 - **Windowshade for the Media Library.** Double-click its title bar and it
   rolls up to a strip, as the main, equalizer and playlist windows do.
 - **Title-bar shortcuts** (Preferences > Shortcuts). Choose what a right

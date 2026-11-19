@@ -4,6 +4,7 @@
 //! on macOS.
 
 use popamp_skin::bitmap::mix;
+use popamp_skin::textcfg::{GLYPH_H, GLYPH_W, glyph, glyph_cell};
 use popamp_skin::{Bitmap, Skin, TextStyle};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -33,16 +34,23 @@ pub struct Fonts {
 
 impl Fonts {
     pub fn for_skin(skin: &Skin) -> Fonts {
-        Fonts::new(skin, None)
+        Fonts::new(skin, None, None)
     }
 
     /// The fonts of `skin`; every text in `custom`, a font file's bytes,
     /// when the user chose a font of their own.
-    pub fn new(skin: &Skin, custom: Option<&[u8]>) -> Fonts {
-        let of = |data: Option<&Vec<u8>>, family: &str| match (custom, data) {
-            (Some(own), _) => Font::from_data(own),
-            (None, Some(d)) => Font::from_data(d),
-            (None, None) => Font::load(family),
+    pub fn new(skin: &Skin, custom: Option<&[u8]>, letters: Option<&Bitmap>) -> Fonts {
+        let of = |data: Option<&Vec<u8>>, family: &str| {
+            let font = match (custom, data) {
+                (Some(own), _) => Font::from_data(own),
+                (None, Some(d)) => Font::from_data(d),
+                (None, None) => Font::load(family),
+            };
+            // The skin's own letters, where it has them, over the rest.
+            match letters {
+                Some(sheet) => font.with_letters(sheet),
+                None => font,
+            }
         };
         let style = |s: &Option<TextStyle>| s.as_ref().map(|s| of(s.font.as_ref(), "sans-serif"));
         Fonts { list: of(skin.pl_font.as_ref(), &skin.pl.font), text: style(&skin.text), clock: style(&skin.clock) }
@@ -74,6 +82,60 @@ pub struct Font {
     /// Which face draws each character met so far; `None` when none can.
     face_of: HashMap<char, Option<usize>>,
     cache: HashMap<(char, u32), (fontdue::Metrics, Vec<u8>)>,
+    /// The letters of a skin's `text.bmp`, which draw what they have.
+    letters: Option<Letters>,
+}
+
+/// The letters of a skin's `text.bmp`: 5x6 pixels each, made as big as a
+/// size asks for by whole multiples.
+struct Letters {
+    sheet: Bitmap,
+    /// The colour of the paper and of the ink, to tell how much of a pixel is ink.
+    paper: u32,
+    ink: u32,
+}
+
+/// How much a pixel's brightness lies from `paper` towards `ink`, 0 to 255.
+fn ink_share(p: u32, paper: u32, ink: u32) -> u8 {
+    let lum = |c: u32| ((c >> 16) & 0xff) * 3 + ((c >> 8) & 0xff) * 6 + (c & 0xff);
+    let (p, paper, ink) = (lum(p) as i64, lum(paper) as i64, lum(ink) as i64);
+    if ink == paper {
+        return if p == paper { 0 } else { 255 };
+    }
+    ((p - paper) * 255 / (ink - paper)).clamp(0, 255) as u8
+}
+
+impl Letters {
+    fn new(sheet: &Bitmap) -> Letters {
+        let (sx, sy) = glyph_cell(' ');
+        let paper = sheet.get(sx * GLYPH_W, sy * GLYPH_H).unwrap_or(0);
+        Letters { sheet: sheet.clone(), paper, ink: popamp_skin::textcfg::text_ink(sheet) }
+    }
+
+    /// How many pixels each pixel of a letter is across for text `px` tall:
+    /// the letters as the skin drew them up to 15, twice as big from 16.
+    fn scale(px: u32) -> i32 {
+        (px as i32 / 8).max(1)
+    }
+
+    /// `c` as a glyph `px` tall: the letter, each of its pixels a square.
+    fn rasterize(&self, c: char, px: u32) -> (fontdue::Metrics, Vec<u8>) {
+        let k = Letters::scale(px);
+        let (cx, cy) = glyph_cell(c);
+        let (w, h) = ((GLYPH_W * k) as usize, (GLYPH_H * k) as usize);
+        let mut coverage = vec![0u8; w * h];
+        for row in 0..GLYPH_H {
+            for col in 0..GLYPH_W {
+                let p = self.sheet.get(cx * GLYPH_W + col, cy * GLYPH_H + row).unwrap_or(self.paper);
+                let a = ink_share(p, self.paper, self.ink);
+                for (dy, dx) in (0..k).flat_map(|dy| (0..k).map(move |dx| (dy, dx))) {
+                    coverage[((row * k + dy) as usize) * w + (col * k + dx) as usize] = a;
+                }
+            }
+        }
+        let metrics = fontdue::Metrics { width: w, height: h, advance_width: w as f32, ..Default::default() };
+        (metrics, coverage)
+    }
 }
 
 /// Whether `face` draws `c`: maps it to a glyph with an outline. A font
@@ -92,7 +154,7 @@ impl Font {
         if face.is_none() {
             log::warn!("no usable TrueType font found; text will be blank");
         }
-        Font { faces: face.into_iter().collect(), files: HashMap::new(), face_of: HashMap::new(), cache: HashMap::new() }
+        Font { faces: face.into_iter().collect(), files: HashMap::new(), face_of: HashMap::new(), cache: HashMap::new(), letters: None }
     }
 
     pub fn load(family: &str) -> Font {
@@ -100,6 +162,13 @@ impl Font {
             let path = system::family(f)?;
             parse(std::fs::read(&path).ok()?, &path.display().to_string())
         }))
+    }
+
+    /// This font, with the letters of a skin's `text.bmp` drawing what they
+    /// have and the font the rest.
+    pub fn with_letters(mut self, sheet: &Bitmap) -> Font {
+        self.letters = Some(Letters::new(sheet));
+        self
     }
 
     /// A font from a font file's bytes, or the system's sans-serif font.
@@ -143,6 +212,12 @@ impl Font {
     }
 
     fn glyph(&mut self, c: char, px: u32) -> Option<&(fontdue::Metrics, Vec<u8>)> {
+        if let Some(letters) = self.letters.as_ref().filter(|_| glyph(c).is_some()) {
+            if self.cache.len() > 4096 {
+                self.cache.clear();
+            }
+            return Some(self.cache.entry((c, px)).or_insert_with(|| letters.rasterize(c, px)));
+        }
         // A character no font has still takes the font's own (blank) glyph.
         let i = self.face(c).or((!self.faces.is_empty()).then_some(0))?;
         let face = &self.faces[i];
@@ -157,6 +232,10 @@ impl Font {
     }
 
     fn ascent_at(&self, size: f32) -> i32 {
+        if self.letters.is_some() {
+            // The letters stand in the middle of the line the size makes.
+            return (size.round() as i32 + GLYPH_H * Letters::scale(size.round() as u32)) / 2;
+        }
         self.faces.first().and_then(|f| f.horizontal_line_metrics(size)).map(|m| m.ascent.round() as i32).unwrap_or(size.round() as i32)
     }
 
@@ -301,9 +380,36 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn the_skins_letters_draw_what_they_have_in_whole_multiples() {
+        let skin = Skin::builtin();
+        let sheet = skin.sheet(popamp_skin::Sheet::Text);
+        let mut font = Font::new(None).with_letters(sheet);
+        // As the skin drew them up to 15 pixels, doubled from 16; 5 wide each.
+        assert_eq!(font.width("Ab", 12), 10, "capitals are the same letters");
+        assert_eq!(font.width("ab", 6), 10);
+        assert_eq!(font.width("ab", 16), 20);
+        assert_eq!(font.ascent(12), 9, "6 pixels of letter in the middle of 12");
+        let mut b = Bitmap::new(40, 20, 0);
+        font.draw(&mut b, 2, 2, "A", 12, 0xff00ff00, 0, 40);
+        let inked: Vec<u32> = b.px.iter().copied().filter(|&p| p != 0).collect();
+        assert!(!inked.is_empty(), "the letter is drawn");
+        assert!(inked.iter().all(|&p| (p >> 8) & 0xff > (p & 0xff)), "in green, not the skin's own colour");
+        // A character the letters lack is the other font's; with none, nothing.
+        assert_eq!(font.width("Ж", 12), 0);
+    }
+
+    #[test]
+    fn ink_is_told_from_paper_by_brightness() {
+        assert_eq!(ink_share(0x000000, 0x000000, 0x00ff00), 0);
+        assert_eq!(ink_share(0x00ff00, 0x000000, 0x00ff00), 255);
+        assert!(ink_share(0x007f00, 0x000000, 0x00ff00) > 100);
+        assert_eq!(ink_share(0x123456, 0x777777, 0x777777), 255, "no contrast: anything else is ink");
+    }
+
+    #[test]
     fn a_custom_font_draws_every_text() {
         let skin = Skin::builtin();
-        let fonts = Fonts::new(&skin, Some(CLOCK));
+        let fonts = Fonts::new(&skin, Some(CLOCK), None);
         let mut font = fonts.list;
         // The clock font has digits but no letters: its own digits are used.
         assert!(draws(&font.faces[0], '7') && !draws(&font.faces[0], 'A'));
