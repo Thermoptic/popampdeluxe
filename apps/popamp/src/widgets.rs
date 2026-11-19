@@ -311,6 +311,13 @@ impl<A: Copy + PartialEq> Form<A> {
         Event::Selected
     }
 
+    /// Ticks or clears check box `i`, as a click would, without an event.
+    pub fn set_checked(&mut self, i: usize, on: bool) {
+        if let Widget::Check { checked, .. } = &mut self.controls[i].1 {
+            *checked = on;
+        }
+    }
+
     /// The picked segment of tabs `i`.
     pub fn tab(&self, i: usize) -> usize {
         match &self.controls[i].1 {

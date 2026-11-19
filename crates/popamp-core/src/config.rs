@@ -183,6 +183,9 @@ settings! {
     ml_height: i32 = 348,
     /// The library window is shaded: only its title bar shows.
     ml_ws: bool = false,
+    /// The media library shows the folder tree, which reads file names,
+    /// not the tags (Preferences > Media Library > Media Library Type).
+    ml_foldertree: bool = false,
     /// Look for new and changed files in the library's folders at start.
     ml_scan_at_start: bool = true,
     // Playback.
@@ -476,6 +479,10 @@ impl Paths {
     }
     pub fn replaygain_file(&self) -> PathBuf {
         self.config_dir.join("replaygain.txt")
+    }
+    /// The folders of the folder tree library, one to a line.
+    pub fn foldertree_file(&self) -> PathBuf {
+        self.config_dir.join("foldertree.txt")
     }
     pub fn library_file(&self) -> PathBuf {
         self.config_dir.join("library.txt")

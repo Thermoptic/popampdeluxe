@@ -21,6 +21,43 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-19   MEDIA LIBRARY FOLDERTREE
+  ..........................................................................
+
+  Preferences > Media Library > Media Library Type
+
+  A second kind of Media Library, in the same window. Choose one of two:
+
+     ( ) Media Library id3         the library as before, from the tags
+     (x) Media Library Foldertree  the new one: folders and file names
+
+  The change shows at once. You cannot choose both.
+
+  The Foldertree library reads no tags. It only looks at folders and file
+  names, and it hides the .mp3 (or .flac, and so on) at the end of a name.
+  The window shows two columns:
+
+     Left      the folders you have added
+     Right     what is inside the folder you picked on the left,
+               like Windows Explorer: folders first, then the songs
+
+  How to use it
+
+     * Press "Add folder" (at the right of "Rescan") and choose a folder.
+       It appears in the left column. Right-click it to remove it again.
+     * Click a folder on the left to see its contents on the right.
+     * Double-click a folder on the right to open it. ".." at the top, or
+       Backspace, goes back up.
+     * Double-click a song to play it, or to add it to the playlist (as in
+       Preferences > Media Library: "Enter and double-click enqueue").
+       Play and Enqueue work on what you have selected, a whole folder too.
+     * Press "Title" to sort A to Z, press again for Z to A. Press "Date
+       modified" for the newest first, and again for the oldest first.
+     * "Rescan" reads the folder again, if files were added meanwhile.
+
+  The list of added folders is kept in foldertree.txt, next to the settings.
+
+
   2026-11-19   CUSTOM FONT
   ..........................................................................
 

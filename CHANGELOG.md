@@ -8,6 +8,19 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Media Library Foldertree** (Preferences > Media Library > Media Library
+  Type): the Media Library window can be a folder tree instead of the tag
+  library. Choose *Media Library id3* (the default) or *Media Library
+  Foldertree*, never both. The folder tree reads no tags, only file names,
+  and writes them without the extension. The left list holds the folders
+  you added with *Add folder* (kept in `foldertree.txt`); the right list
+  shows what is in the one picked, as Explorer does: folders first, then
+  the audio files, with *Title* and *Date modified* columns that sort A to Z
+  or Z to A, and oldest or newest first, when pressed. A double click on a
+  folder goes into it, `..` or Backspace comes back, and a double click on a
+  file plays it or adds it to the playlist, as before. *Rescan* reads the
+  folder again and *Add folder*, at its right, adds a folder to the left
+  list. Right-click a folder on the left to remove it from the list.
 - **Custom Skin Bmp Font** (Preferences > Interface): draws the text of
   the player, in the playlist, the library, menus and dialogs, with the
   letters of the skin's `text.bmp`, the same ones the skin writes its small

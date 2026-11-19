@@ -116,6 +116,10 @@
     even when the icon is otherwise off. On Linux, notifications of each
     new track with its cover, off by default. Both are in Preferences >
     Desktop.
+  - Media Library Foldertree (Preferences > Media Library > Media Library
+    Type): the library window as a folder tree that reads file names, not
+    tags: added folders on the left, an Explorer-like list on the right
+    (Title and Date modified, sortable).
   - Custom Skin Bmp Font (Preferences > Interface): the playlist, library,
     menus and dialogs written with the letters of the skin's `text.bmp`.
   - Custom font (Preferences > Interface): any TrueType or OpenType font

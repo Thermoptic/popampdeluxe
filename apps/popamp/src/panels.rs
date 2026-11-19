@@ -41,6 +41,8 @@ pub enum Act {
     ChangeCover,
     RemoveCover,
     Flag(Flag),
+    /// One of the two kinds of media library: true for the folder tree.
+    LibraryType(bool),
     /// A section of Preferences was picked.
     Section,
     /// A file type check box, read on OK.
@@ -606,6 +608,8 @@ pub struct Preferences {
     /// The fonts to choose from, by file name, and the drop-down that shows them.
     fonts: Vec<String>,
     font_choice: usize,
+    /// The check boxes of the media library types: the tags, the folder tree.
+    library_type: [usize; 2],
 }
 
 /// Shortcut rows on the Shortcuts page.
@@ -628,6 +632,7 @@ impl Preferences {
         let mut shortcut_rows = Vec::new();
         let mut fonts: Vec<String> = Vec::new();
         let mut font_choice = 0;
+        let mut library_type = [0; 2];
         for (page, section) in Section::ALL.into_iter().enumerate() {
             let flags = section.flags();
             let rows = flags.len() as i32;
@@ -665,6 +670,15 @@ impl Preferences {
                     device_list = form.add_on(page, Rect::new(x0 + 140, y, cw - 140, DEVICE_ROWS * ROW_H + 4), list);
                     form.set_rows(device_list, devices.iter().map(|d| d.label.clone()).collect(), current);
                     y += DEVICE_ROWS * ROW_H + 10;
+                }
+                Section::Library => {
+                    form.add_on(page, Rect::new(x0, y, cw, 22 + 2 * 22), Widget::Group { label: "Media Library Type".into() });
+                    for (n, (label, tree)) in [("Media Library id3", false), ("Media Library Foldertree", true)].into_iter().enumerate() {
+                        let r = Rect::new(x0 + 12, y + 20 + n as i32 * 22, cw - 24, 20);
+                        let check = Widget::Check { label: label.into(), checked: s.ml_foldertree == tree, action: Act::LibraryType(tree) };
+                        library_type[n] = form.add_on(page, r, check);
+                    }
+                    y += 30 + 2 * 22;
                 }
                 Section::Interface => {
                     // A font from a `fonts` folder, and its size beside it.
@@ -771,6 +785,7 @@ impl Preferences {
             shortcut_rows,
             fonts,
             font_choice,
+            library_type,
         }
     }
 
@@ -778,6 +793,13 @@ impl Preferences {
         match ev {
             Event::Toggled(Act::Flag(f), on) => {
                 f.set(model, on);
+                true
+            }
+            Event::Toggled(Act::LibraryType(tree), _) => {
+                // One or the other, never both: the one clicked is the one chosen.
+                self.form.set_checked(self.library_type[0], !tree);
+                self.form.set_checked(self.library_type[1], tree);
+                model.set_library_type(tree);
                 true
             }
             Event::Clicked(Act::Ok) => self.apply(model),
@@ -1344,6 +1366,47 @@ pub(crate) mod tests {
         assert_eq!(pr.form.choice(pr.font_choice), 1);
         m.settings_mut().custom_font = false;
         assert_eq!(m.settings().list_font_px(), 10, "off: the playlist font size is used");
+    }
+
+    #[test]
+    fn the_media_library_type_is_one_of_two_and_applies_at_once() {
+        let mut m = songs(&[]);
+        let mut p = Panel::open(PanelKind::Preferences, &m);
+        let types = |p: &Panel| {
+            let Panel::Prefs(pr) = p else { unreachable!() };
+            pr.library_type
+        };
+        let ticked = |p: &Panel| {
+            let Panel::Prefs(pr) = p else { unreachable!() };
+            pr.library_type.map(|i| matches!(pr.form.widget(i), Widget::Check { checked: true, .. }))
+        };
+        assert!(!m.settings().ml_foldertree && !m.library.tree_mode, "the id3 library is the default");
+        assert_eq!(ticked(&p), [true, false]);
+        let [id3, tree] = types(&p);
+        // Both are on the Media Library page, with the labels asked for.
+        let Panel::Prefs(pr) = &p else { unreachable!() };
+        assert_eq!(pr.form.page_of(id3), pr.form.page_of(tree));
+        let labels: Vec<String> = [id3, tree]
+            .iter()
+            .map(|&i| match pr.form.widget(i) {
+                Widget::Check { label, .. } => label.clone(),
+                _ => String::new(),
+            })
+            .collect();
+        assert_eq!(labels, ["Media Library id3", "Media Library Foldertree"]);
+
+        let r = reach(&mut p, &mut m, tree);
+        click(&mut p, &mut m, r);
+        assert!(m.settings().ml_foldertree && m.library.tree_mode, "the folder tree at once");
+        assert_eq!(ticked(&p), [false, true], "never both");
+        // Clicking the one that is chosen keeps it chosen.
+        click(&mut p, &mut m, r);
+        assert!(m.settings().ml_foldertree);
+        assert_eq!(ticked(&p), [false, true]);
+        let r = reach(&mut p, &mut m, id3);
+        click(&mut p, &mut m, r);
+        assert!(!m.settings().ml_foldertree && !m.library.tree_mode);
+        assert_eq!(ticked(&p), [true, false]);
     }
 
     #[test]

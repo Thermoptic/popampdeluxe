@@ -16,18 +16,18 @@
 
 use crate::canvas::Canvas;
 use crate::font::Font;
-use crate::model::{AddMode, AppEvent, Model};
+use crate::model::{AddMode, AppEvent, Model, UiReq};
 use crate::widgets::Key;
 use popamp_audio::source::{Context, Sources};
+use popamp_core::Command;
 use popamp_core::library::{Filter, Group, GroupRow, Library, Sort, Track};
 use popamp_core::replaygain::Stamp;
 use popamp_core::text::format_duration_ms;
-use popamp_core::Command;
 use popamp_skin::bitmap::mix;
 use popamp_skin::{PlColors, Rect};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// A row of the views list.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,7 +43,7 @@ enum View {
 /// The lists of the window, in the order Tab goes through them; also
 /// where each keeps its scroll.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum List {
+pub(crate) enum List {
     Views,
     Artists,
     Albums,
@@ -95,7 +95,7 @@ impl Column {
 /// How wide a column is: a share of what the fixed ones leave, or a
 /// number of times the text height.
 #[derive(Debug, Clone, Copy)]
-enum Width {
+pub(crate) enum Width {
     Share(i32),
     Px(i32),
 }
@@ -112,7 +112,7 @@ const TABLE: [(Column, Width, i32); 6] = [
 ];
 
 /// Places `cols` across `area`, left to right.
-fn lay<T: Copy>(cols: &[(T, Width)], area: Rect, px: i32) -> Vec<(T, i32, i32)> {
+pub(crate) fn lay<T: Copy>(cols: &[(T, Width)], area: Rect, px: i32) -> Vec<(T, i32, i32)> {
     let fixed: i32 = cols.iter().map(|c| if let Width::Px(n) = c.1 { n * px } else { 0 }).sum();
     let shares: i32 = cols.iter().map(|c| if let Width::Share(n) = c.1 { n } else { 0 }).sum::<i32>().max(1);
     let room = (area.w - fixed).max(0);
@@ -154,29 +154,29 @@ const OWN_BAR: i32 = 6;
 
 /// A list with a header row above its rows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Table {
-    header: Rect,
-    rows: Rect,
+pub(crate) struct Table {
+    pub(crate) header: Rect,
+    pub(crate) rows: Rect,
 }
 
 /// Where the parts are in the skin's rectangle, in skin pixels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Parts {
-    views: Rect,
-    search: Rect,
+pub(crate) struct Parts {
+    pub(crate) views: Rect,
+    pub(crate) search: Rect,
     /// The artists and the albums, when the view has them.
-    panes: Option<[Table; 2]>,
-    table: Table,
-    buttons: [Rect; 4],
-    status: Rect,
-    row_h: i32,
+    pub(crate) panes: Option<[Table; 2]>,
+    pub(crate) table: Table,
+    pub(crate) buttons: [Rect; 4],
+    pub(crate) status: Rect,
+    pub(crate) row_h: i32,
     /// The width of each list's scroll bar, right of its rows, and the
     /// length of the skin's thumb.
-    bar_w: i32,
-    thumb_h: Option<i32>,
+    pub(crate) bar_w: i32,
+    pub(crate) thumb_h: Option<i32>,
 }
 
-const fn rect(x: i32, y: i32, w: i32, h: i32) -> Rect {
+pub(crate) const fn rect(x: i32, y: i32, w: i32, h: i32) -> Rect {
     Rect { x, y, w, h }
 }
 
@@ -184,7 +184,7 @@ impl Parts {
     /// Lays the parts out for `at`; `panes` leaves room for the artists and
     /// the albums above the table. Each list keeps the right of its room
     /// for its scroll bar.
-    fn new(at: Place, panes: bool) -> Parts {
+    pub(crate) fn new(at: Place, panes: bool) -> Parts {
         let Place { r, px, .. } = at;
         let bar_w = at.thumb.map_or(OWN_BAR, |t| t.0);
         let row_h = px + 3;
@@ -219,12 +219,12 @@ impl Parts {
     }
 
     /// The scroll bar of a list, right of its rows.
-    fn bar(&self, list: List) -> Option<Rect> {
+    pub(crate) fn bar(&self, list: List) -> Option<Rect> {
         self.rows(list).map(|r| rect(r.x + r.w, r.y, self.bar_w, r.h))
     }
 
     /// The rows of a list.
-    fn rows(&self, list: List) -> Option<Rect> {
+    pub(crate) fn rows(&self, list: List) -> Option<Rect> {
         match list {
             List::Views => Some(self.views),
             List::Artists => self.panes.map(|p| p[0].rows),
@@ -234,12 +234,12 @@ impl Parts {
     }
 
     /// How many whole rows a list shows; at least one.
-    fn page(&self, list: Rect) -> usize {
+    pub(crate) fn page(&self, list: Rect) -> usize {
         (list.h / self.row_h).max(1) as usize
     }
 
     /// The row of `list` at height `y`, before scrolling.
-    fn row(&self, list: Rect, y: i32) -> usize {
+    pub(crate) fn row(&self, list: Rect, y: i32) -> usize {
         ((y - list.y).max(0) / self.row_h) as usize
     }
 }
@@ -266,13 +266,13 @@ pub enum LibEvent {
 /// A plain press on a table row: it carries the picked tracks once the
 /// mouse moves far enough, else it is a click on `row`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Carry {
+pub(crate) enum Carry {
     Pressed { x: i32, y: i32, row: usize },
     Moving,
 }
 
 /// How far the mouse goes before a press carries.
-const CARRY_SLACK: i32 = 4;
+pub(crate) const CARRY_SLACK: i32 = 4;
 
 /// What the window layer has to do after an input.
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -318,6 +318,10 @@ pub struct LibraryPane {
     carry: Option<Carry>,
     pub scan: Option<Scan>,
     scans: u64,
+    /// The other kind of library: the folders and the names of the files.
+    pub tree: crate::foldertree::FolderTree,
+    /// Whether the folder tree is the library on screen.
+    pub tree_mode: bool,
 }
 
 /// The last part of a folder's path, which names it in the views.
@@ -347,6 +351,8 @@ impl LibraryPane {
             carry: None,
             scan: None,
             scans: 0,
+            tree: Default::default(),
+            tree_mode: false,
         };
         p.refresh();
         p
@@ -410,6 +416,9 @@ impl LibraryPane {
 
     /// The paths of the picked tracks, in table order.
     pub fn picked(&self) -> Vec<String> {
+        if self.tree_mode {
+            return self.tree.picked();
+        }
         let all = !self.selected.contains(&true);
         let rows = self.shown.iter().zip(&self.selected).filter(|(_, &on)| all || on);
         rows.map(|(&i, _)| self.lib.tracks[i].path.clone()).collect()
@@ -417,6 +426,9 @@ impl LibraryPane {
 
     /// The folder of the view on screen, when it shows one.
     pub fn folder(&self) -> Option<&str> {
+        if self.tree_mode {
+            return self.tree.folder();
+        }
         match &self.view {
             View::Folder(f) => Some(f),
             _ => None,
@@ -426,17 +438,16 @@ impl LibraryPane {
     /// What the window's small display says: the shown tracks and how
     /// long they play.
     pub fn status(&self) -> String {
+        if self.tree_mode {
+            return self.tree.status();
+        }
         if let Some(s) = &self.scan {
             return format!("Scanning: {}", s.done);
         }
         let n = self.shown.len();
         let ms: u64 = self.shown.iter().filter_map(|&i| self.lib.tracks[i].length_ms).sum();
         let tracks = if n == 1 { "1 track".to_string() } else { format!("{n} tracks") };
-        if ms == 0 {
-            tracks
-        } else {
-            format!("{tracks} [{}]", format_duration_ms(ms))
-        }
+        if ms == 0 { tracks } else { format!("{tracks} [{}]", format_duration_ms(ms)) }
     }
 
     // --- the panes ------------------------------------------------------------
@@ -517,6 +528,9 @@ impl LibraryPane {
 
     /// The thumbs the skin draws, each with whether the mouse holds it.
     pub fn thumbs(&self, at: Place) -> Vec<(Rect, bool)> {
+        if self.tree_mode {
+            return self.tree.thumbs(at);
+        }
         if at.thumb.is_none() {
             return Vec::new();
         }
@@ -595,6 +609,9 @@ impl LibraryPane {
     /// that plays. The thumbs of the bars are left to the skin when it
     /// gives one (see `thumbs`).
     pub fn draw(&self, b: &mut Canvas, font: &mut Font, at: Place, c: &PlColors, active: bool, playing: Option<&str>) {
+        if self.tree_mode {
+            return self.tree.draw(b, font, at, c, active, playing);
+        }
         let (r, px) = (at.r, at.px);
         let p = self.parts(at);
         let (dim, line) = (mix(c.normal, c.normal_bg, 0.45), mix(c.normal, c.normal_bg, 0.7));
@@ -755,6 +772,9 @@ impl LibraryPane {
 
     /// The right button went down: the menu is for the row under it.
     pub fn press_right(&mut self, at: Place, x: i32, y: i32) {
+        if self.tree_mode {
+            return self.tree.press_right(at, x, y);
+        }
         let p = self.parts(at);
         if let Some(n) = self.row_at(&p, List::Tracks, x, y).filter(|&n| !self.selected[n]) {
             self.select_only(n);
@@ -778,6 +798,9 @@ impl LibraryPane {
     /// The left button went down at `x`, `y`.
     #[allow(clippy::too_many_arguments)]
     pub fn press(&mut self, at: Place, x: i32, y: i32, shift: bool, ctrl: bool, double: bool) -> Reaction {
+        if self.tree_mode {
+            return self.tree.press(at, x, y, shift, ctrl, double);
+        }
         self.carry = None;
         let p = self.parts(at);
         if let Some(i) = p.buttons.iter().position(|k| k.contains(x, y)) {
@@ -821,6 +844,9 @@ impl LibraryPane {
     /// follows it, held rows start being carried. True when that changed
     /// what the window shows.
     pub fn drag(&mut self, at: Place, x: i32, y: i32) -> bool {
+        if self.tree_mode {
+            return self.tree.drag(at, x, y);
+        }
         if let Some((list, grab)) = self.dragging {
             self.scroll_thumb_to(&self.parts(at), list, y - grab);
             return true;
@@ -835,12 +861,18 @@ impl LibraryPane {
 
     /// Whether the picked tracks are being carried by the mouse.
     pub fn carrying(&self) -> bool {
+        if self.tree_mode {
+            return self.tree.carrying();
+        }
         self.carry == Some(Carry::Moving)
     }
 
     /// True once after the picked tracks were carried out by the mouse,
     /// for the window layer to put them where they were let go.
     pub fn take_carried(&mut self) -> bool {
+        if self.tree_mode {
+            return self.tree.take_carried();
+        }
         let moving = self.carry == Some(Carry::Moving);
         if moving {
             self.carry = None;
@@ -890,6 +922,9 @@ impl LibraryPane {
     /// The left button went up: a button pressed and let go over itself
     /// runs; a row clicked without carrying is the only one picked.
     pub fn release(&mut self, at: Place, x: i32, y: i32) -> Option<Command> {
+        if self.tree_mode {
+            return self.tree.release(at, x, y);
+        }
         self.dragging = None;
         if let Some(Carry::Pressed { row, .. }) = self.carry.take() {
             self.select_only(row);
@@ -901,6 +936,9 @@ impl LibraryPane {
     /// Scrolls the list under the mouse by `steps` wheel notches (up is
     /// positive); the table when it is over none.
     pub fn wheel(&mut self, at: Place, x: i32, y: i32, steps: i32) {
+        if self.tree_mode {
+            return self.tree.wheel(at, x, y, steps);
+        }
         let p = self.parts(at);
         let over = |l: List| [p.rows(l), p.bar(l)].into_iter().flatten().any(|r| r.contains(x, y));
         let under = [List::Views, List::Artists, List::Albums].into_iter().find(|&l| over(l));
@@ -917,6 +955,9 @@ impl LibraryPane {
     /// in the list with the focus, Enter plays (`shift`: enqueues). False
     /// for a key the pane has no use for.
     pub fn key(&mut self, at: Place, key: Key, shift: bool) -> (bool, Option<Command>) {
+        if self.tree_mode {
+            return self.tree.key(at, key, shift);
+        }
         let p = self.parts(at);
         match key {
             Key::Char(c) if !c.is_control() => {
@@ -968,22 +1009,25 @@ impl LibraryPane {
     }
 
     pub fn select_all(&mut self) {
+        if self.tree_mode {
+            return self.tree.select_all();
+        }
         self.selected.fill(true);
     }
 }
 
 /// Text drawing for the pane: one font and size, fitted to its cell.
-struct Pen<'a, 'b> {
-    b: &'a mut Canvas<'b>,
-    font: &'a mut Font,
-    px: u32,
+pub(crate) struct Pen<'a, 'b> {
+    pub(crate) b: &'a mut Canvas<'b>,
+    pub(crate) font: &'a mut Font,
+    pub(crate) px: u32,
     /// Grey text and lines.
-    dim: u32,
-    line: u32,
+    pub(crate) dim: u32,
+    pub(crate) line: u32,
 }
 
 impl Pen<'_, '_> {
-    fn width(&mut self, text: &str) -> i32 {
+    pub(crate) fn width(&mut self, text: &str) -> i32 {
         self.b.text_width(self.font, text, self.px)
     }
 
@@ -997,18 +1041,18 @@ impl Pen<'_, '_> {
         self.b.text(self.font, x, y, text, self.px, color, cell);
     }
 
-    fn left(&mut self, cell: Rect, text: &str, color: u32) {
+    pub(crate) fn left(&mut self, cell: Rect, text: &str, color: u32) {
         let t = self.fitted(text, cell.w - 4);
         self.at(cell, cell.x + 2, &t, color);
     }
 
-    fn right(&mut self, cell: Rect, text: &str, color: u32) {
+    pub(crate) fn right(&mut self, cell: Rect, text: &str, color: u32) {
         let t = self.fitted(text, cell.w - 4);
         let w = self.width(&t);
         self.at(cell, cell.x + cell.w - 2 - w, &t, color);
     }
 
-    fn centre(&mut self, cell: Rect, text: &str, color: u32) {
+    pub(crate) fn centre(&mut self, cell: Rect, text: &str, color: u32) {
         let t = self.fitted(text, cell.w - 2);
         let w = self.width(&t);
         self.at(cell, cell.x + (cell.w - w) / 2, &t, color);
@@ -1071,6 +1115,10 @@ impl Model {
     /// Looks through the library's folders again, in the background; a
     /// scan under way is given up for the new one.
     pub fn library_rescan(&mut self) {
+        if self.library.tree_mode {
+            // The folder tree has nothing to scan: it reads the folder on screen again.
+            return self.library.tree.reload();
+        }
         let pane = &mut self.library;
         if let Some(old) = pane.scan.take() {
             old.cancel.store(true, Ordering::Relaxed);
@@ -1115,6 +1163,20 @@ impl Model {
         }
     }
 
+    fn save_tree(&self) {
+        if let Err(e) = self.library.tree.save(&self.paths.foldertree_file()) {
+            log::warn!("cannot save the folder tree: {e}");
+        }
+    }
+
+    /// Chooses which library the window shows: the tags (false) or the folder tree.
+    pub fn set_library_type(&mut self, tree: bool) {
+        self.settings_mut().ml_foldertree = tree;
+        self.library.tree_mode = tree;
+        self.ui.push(UiReq::Layout);
+        self.pl_dirty += 1;
+    }
+
     fn save_library(&self) {
         if let Err(e) = self.library.lib.save(&self.paths.library_file()) {
             log::warn!("cannot save the library: {e}");
@@ -1123,6 +1185,12 @@ impl Model {
 
     /// Takes a folder into the library and reads it.
     pub fn library_add_folder(&mut self, folder: &str) {
+        if self.library.tree_mode {
+            if !self.library.tree.add_root(folder) {
+                self.flash("LIBRARY: THE FOLDER IS THERE ALREADY");
+            }
+            return self.save_tree();
+        }
         if !self.library.lib.add_folder(folder) {
             return self.flash("LIBRARY: THE FOLDER IS THERE ALREADY");
         }
@@ -1133,6 +1201,10 @@ impl Model {
 
     /// Takes the folder on screen out of the library; its files stay.
     pub fn library_remove_folder(&mut self) {
+        if self.library.tree_mode {
+            self.library.tree.remove_root();
+            return self.save_tree();
+        }
         let Some(folder) = self.library.folder().map(str::to_string) else { return };
         self.library.lib.remove_folder(&folder);
         self.library.refresh();
@@ -1154,11 +1226,7 @@ impl Model {
     /// What Enter and a double click run (`other`: Shift+Enter): Play, or
     /// Enqueue when that is the default.
     pub fn library_open(&self, other: bool) -> Command {
-        if self.settings().enqueuedef != other {
-            Command::LibraryEnqueue
-        } else {
-            Command::LibraryPlay
-        }
+        if self.settings().enqueuedef != other { Command::LibraryEnqueue } else { Command::LibraryPlay }
     }
 
     pub fn library_menu(&self) -> Vec<crate::menu::MenuItem> {
@@ -1172,7 +1240,8 @@ impl Model {
             MenuItem::cmd("Rescan folders", "", Command::LibraryRescan),
         ];
         if let Some(folder) = self.library.folder() {
-            items.push(MenuItem::cmd(&format!("Remove “{}” from the library", folder_label(folder)), "", Command::LibraryRemoveFolder));
+            let what = if self.library.tree_mode { "from the list" } else { "from the library" };
+            items.push(MenuItem::cmd(&format!("Remove “{}” {what}", folder_label(folder)), "", Command::LibraryRemoveFolder));
         }
         items
     }

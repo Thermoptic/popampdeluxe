@@ -5,6 +5,9 @@
 *Updated 2026-11-19. The same list, as a text file that comes with every
 download: [popampdeluxe.txt](popampdeluxe.txt).*
 
+- **Media Library Foldertree** (Preferences > Media Library). A second kind
+  of library window: add folders on the left, browse them like Explorer on
+  the right, by file name, sorted by title or date.
 - **A custom font** (Preferences > Interface). Pick any `.ttf` or `.otf`
   from the `fonts` folder and a size, for the playlist, library, menus and
   dialogs, or tick *Custom Skin Bmp Font* to write them with the letters of

@@ -259,6 +259,9 @@ impl Model {
         let scanned = Arc::new(Scanned::load(&paths.replaygain_file()));
         let format = Format::cached(&config.settings.titlefmt);
         let library = crate::library::LibraryPane::new(popamp_core::library::Library::load(&paths.library_file()));
+        let mut library = library;
+        library.tree = crate::foldertree::FolderTree::load(&paths.foldertree_file());
+        library.tree_mode = config.settings.ml_foldertree;
         let skin = Skin::builtin_vector(Some(&config.settings.skin_colors));
         let mut m = Model {
             library,
