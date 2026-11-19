@@ -8,7 +8,7 @@
 ==============================================================================
 
   Version ........ 1.0.1 and later
-  Updated ........ 2026-11-18
+  Updated ........ 2026-11-19
   Project ........ https://github.com/Thermoptic/popampdeluxe
 
   This file lists the biggest changes in Popamp Deluxe, one feature at a
@@ -19,6 +19,19 @@
 ------------------------------------------------------------------------------
   NEWEST FIRST
 ------------------------------------------------------------------------------
+
+
+  2026-11-19   WINDOWSHADE FOR THE MEDIA LIBRARY
+  ..........................................................................
+
+  The Media Library window can now roll up, like the main, equalizer and
+  playlist windows. Double-click its title bar and it shrinks to a thin
+  strip that shows "MEDIA LIBRARY" and keeps its close button. Double-click
+  the strip, or press the small button on its right, and it opens again at
+  the size it had.
+
+  The shaded state is remembered, and it works with every skin, including
+  skins that draw their own library window.
 
 
   2026-11-18   TITLE-BAR SHORTCUTS

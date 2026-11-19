@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Windowshade for the Media Library:** a double click on the library
+  window's title bar rolls it up to its title strip, and another unrolls
+  it, as with the other windows. A classic skin also has the shade button
+  there. A skin that draws the library window itself gets the strip too,
+  unless it gives its own `shade`. The setting is `ml_ws`.
 - **Title-bar shortcuts** (Preferences > Shortcuts): choose what a right
   or middle click on the title bar of the main, equalizer or playlist
   window does (the part that drags the window, full size or shaded):

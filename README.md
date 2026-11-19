@@ -2,9 +2,11 @@
 
 ## What's new in Popamp Deluxe
 
-*Updated 2026-11-18. The same list, as a text file that comes with every
+*Updated 2026-11-19. The same list, as a text file that comes with every
 download: [popampdeluxe.txt](popampdeluxe.txt).*
 
+- **Windowshade for the Media Library.** Double-click its title bar and it
+  rolls up to a strip, as the main, equalizer and playlist windows do.
 - **Title-bar shortcuts** (Preferences > Shortcuts). Choose what a right
   click, a middle click or the mouse wheel on the title bar of the main,
   equalizer or playlist window does, in full size or windowshade mode:
