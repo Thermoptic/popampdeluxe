@@ -21,6 +21,36 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-19   CUSTOM FONT
+  ..........................................................................
+
+  Preferences > Interface
+
+  Draw the text of the player with a font of your own. Tick "Custom font",
+  choose a font from the drop-down list, and type the size you want in the
+  Size box, then press OK. The change shows at once.
+
+     [x] Custom font
+     [ KROE0553.TTF            v ]   Size [ 16 ]
+
+  The list shows the fonts in the "fonts" folder next to the program:
+  .ttf, .otf and .ttc files. Put a font file there and it appears the next
+  time you open Preferences. (Old bitmap fonts, .fon, cannot be used.)
+
+  What changes
+
+     * The font is used for the playlist, the Media Library, the menus,
+       the dialogs (like Preferences itself) and for the texts of vector
+       skins.
+     * The size is the size of the text in the playlist and the library.
+       Menus and dialogs keep their own size.
+     * A classic skin's lettering on the main window (the song title and
+       the little displays) is part of the skin's pictures and stays.
+
+  If the chosen font file is taken away, Popamp shows it as "(not found)"
+  and uses its usual font until you choose another.
+
+
   2026-11-19   WINDOWSHADE FOR THE MEDIA LIBRARY
   ..........................................................................
 

@@ -318,6 +318,15 @@ impl Model {
         m
     }
 
+    /// The bytes of the custom font, when the user turned one on and it can
+    /// be read from a `fonts` folder.
+    pub fn custom_font(&self) -> Option<Vec<u8>> {
+        let s = self.settings();
+        let name = Path::new(&s.font_file).file_name().filter(|_| s.custom_font)?;
+        let path = self.paths.fonts_dirs().into_iter().map(|d| d.join(name)).find(|p| p.is_file())?;
+        std::fs::read(path).map_err(|e| log::warn!("cannot read font {}: {e}", s.font_file)).ok()
+    }
+
     pub fn settings(&self) -> &Settings {
         &self.config.settings
     }

@@ -33,10 +33,36 @@ pub struct Fonts {
 
 impl Fonts {
     pub fn for_skin(skin: &Skin) -> Fonts {
-        let of = |data: Option<&Vec<u8>>, family: &str| data.map_or_else(|| Font::load(family), |d| Font::from_data(d));
+        Fonts::new(skin, None)
+    }
+
+    /// The fonts of `skin`; every text in `custom`, a font file's bytes,
+    /// when the user chose a font of their own.
+    pub fn new(skin: &Skin, custom: Option<&[u8]>) -> Fonts {
+        let of = |data: Option<&Vec<u8>>, family: &str| match (custom, data) {
+            (Some(own), _) => Font::from_data(own),
+            (None, Some(d)) => Font::from_data(d),
+            (None, None) => Font::load(family),
+        };
         let style = |s: &Option<TextStyle>| s.as_ref().map(|s| of(s.font.as_ref(), "sans-serif"));
         Fonts { list: of(skin.pl_font.as_ref(), &skin.pl.font), text: style(&skin.text), clock: style(&skin.clock) }
     }
+}
+
+/// The font files in `dirs` that can be chosen: TrueType and OpenType.
+/// Of two with the same name, the one in the earlier folder wins.
+pub fn installed(dirs: &[PathBuf]) -> Vec<PathBuf> {
+    let mut seen = std::collections::HashSet::new();
+    let mut v: Vec<PathBuf> = dirs
+        .iter()
+        .flat_map(|dir| std::fs::read_dir(dir).into_iter().flatten().flatten())
+        .map(|e| e.path())
+        .filter(|p| p.is_file() && p.extension().is_some_and(|e| ["ttf", "otf", "ttc"].iter().any(|x| e.eq_ignore_ascii_case(x))))
+        .filter(|p| seen.insert(p.file_name().map(|n| n.to_ascii_lowercase())))
+        .collect();
+    let name = |p: &PathBuf| p.file_name().unwrap_or_default().to_string_lossy().into_owned();
+    v.sort_by(|a, b| popamp_core::text::natural_cmp(&name(a), &name(b)));
+    v
 }
 
 pub struct Font {
@@ -247,6 +273,42 @@ pub(crate) mod tests {
     }
 
     const CLOCK: &[u8] = include_bytes!("../../../crates/popamp-skin/tests/fixtures/fonts-shade/fonts/clock.ttf");
+
+    #[test]
+    fn the_fonts_folders_list_truetype_and_opentype_files_by_name() {
+        let root = std::env::temp_dir().join(format!("popamp-installed-fonts-{}", std::process::id()));
+        let (user, system) = (root.join("user"), root.join("system"));
+        for d in [&user, &system] {
+            std::fs::create_dir_all(d).unwrap();
+        }
+        for (d, n) in [
+            (&user, "B.ttf"),
+            (&user, "notes.txt"),
+            (&user, "old.fon"),
+            (&system, "a.OTF"),
+            (&system, "b.TTF"),
+            (&system, "c10.ttf"),
+            (&system, "c9.ttf"),
+        ] {
+            std::fs::write(d.join(n), b"x").unwrap();
+        }
+        let names: Vec<String> = installed(&[user, system, root.join("missing")])
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(names, ["a.OTF", "B.ttf", "c9.ttf", "c10.ttf"], "no .txt or .fon; the user's B.ttf hides the other");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn a_custom_font_draws_every_text() {
+        let skin = Skin::builtin();
+        let fonts = Fonts::new(&skin, Some(CLOCK));
+        let mut font = fonts.list;
+        // The clock font has digits but no letters: its own digits are used.
+        assert!(draws(&font.faces[0], '7') && !draws(&font.faces[0], 'A'));
+        assert!(font.width("0123", 12) > 0);
+    }
 
     #[test]
     fn a_font_draws_the_characters_it_has_outlines_for() {

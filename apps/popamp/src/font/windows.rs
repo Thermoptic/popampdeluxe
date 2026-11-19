@@ -52,11 +52,7 @@ fn families_of(value_name: &str) -> impl Iterator<Item = &str> {
 /// A registry value's file: a path, or a name in the fonts folder.
 fn file_of(value: &str, fonts_dir: &Path) -> PathBuf {
     let path = Path::new(value);
-    if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        fonts_dir.join(path)
-    }
+    if path.is_absolute() { path.to_path_buf() } else { fonts_dir.join(path) }
 }
 
 /// The file of `family` among the registry's `(value name, file)` entries.
@@ -91,7 +87,7 @@ mod system {
     use std::sync::OnceLock;
     use windows_sys::Win32::Foundation::ERROR_SUCCESS;
     use windows_sys::Win32::System::Registry::{
-        RegCloseKey, RegEnumValueW, RegOpenKeyExW, HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, REG_SZ,
+        HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, REG_SZ, RegCloseKey, RegEnumValueW, RegOpenKeyExW,
     };
 
     /// The registry's fonts, the machine's and then the user's, read once.

@@ -84,9 +84,12 @@ impl Panel {
         match kind {
             PanelKind::JumpToFile => Panel::Jump(JumpToFile::new(model)),
             PanelKind::FileInfo => Panel::Info(FileInfo::new(model)),
-            PanelKind::Preferences => {
-                Panel::Prefs(Preferences::new(model.settings(), popamp_audio::output::devices(), FileTypes::from_env()))
-            }
+            PanelKind::Preferences => Panel::Prefs(Preferences::new(
+                model.settings(),
+                popamp_audio::output::devices(),
+                FileTypes::from_env(),
+                crate::font::installed(&model.paths.fonts_dirs()),
+            )),
             #[cfg(feature = "plugins")]
             PanelKind::Plugins => Panel::Plugins(crate::plugins::PluginsPanel::new(model)),
             PanelKind::SkinMuseum => Panel::Museum(SkinMuseum::new()),
@@ -333,6 +336,7 @@ pub enum Flag {
     DimInactive,
     ShowNumbers,
     ZeroPad,
+    CustomFont,
     AutoAdvance,
     TrayIcon,
     MinimizeToTray,
@@ -356,6 +360,7 @@ impl Flag {
             Flag::DimInactive => "Dim inactive playlist",
             Flag::ShowNumbers => "Show playlist numbers",
             Flag::ZeroPad => "Zero-pad numbers",
+            Flag::CustomFont => "Custom font",
             Flag::AutoAdvance => "Advance to next track",
             Flag::TrayIcon => "Icon in the system tray",
             Flag::MinimizeToTray => "Minimize to the tray",
@@ -392,6 +397,7 @@ impl Flag {
             Flag::DimInactive => &mut s.dim_inactive,
             Flag::ShowNumbers => &mut s.shownumsinpl,
             Flag::ZeroPad => &mut s.zeropadplnum,
+            Flag::CustomFont => &mut s.custom_font,
             Flag::AutoAdvance => &mut s.pladv,
             Flag::TrayIcon => &mut s.tray_icon,
             Flag::MinimizeToTray => &mut s.minimize_to_tray,
@@ -419,7 +425,7 @@ impl Flag {
             Some(c) => model.exec(c),
             None => *self.slot(model.settings_mut()) = on,
         }
-        if self == Flag::SkinCursors {
+        if matches!(self, Flag::SkinCursors | Flag::CustomFont) {
             model.ui.push(UiReq::SkinChanged);
         }
         model.pl_dirty += 1;
@@ -429,6 +435,7 @@ impl Flag {
 /// The preferences typed in. They apply on OK; Cancel forgets the edits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Field {
+    CustomFontSize,
     FontSize,
     TitleFormat,
     FadeMs,
@@ -441,6 +448,7 @@ pub enum Field {
 impl Field {
     fn label(self) -> &'static str {
         match self {
+            Field::CustomFontSize => "Size",
             Field::FontSize => "Playlist font size",
             Field::TitleFormat => "Title format",
             Field::FadeMs => "Fade-out (ms)",
@@ -453,6 +461,7 @@ impl Field {
 
     fn get(self, s: &Settings) -> String {
         match self {
+            Field::CustomFontSize => s.font_size.to_string(),
             Field::FontSize => s.pe_fontsize.to_string(),
             Field::TitleFormat => s.titlefmt.clone(),
             Field::FadeMs => s.fade_ms.to_string(),
@@ -467,6 +476,7 @@ impl Field {
     fn check(self, text: &str) -> Result<(), String> {
         let number = |what| text.trim().parse::<u32>().map(drop).map_err(|_| format!("{what}: enter a whole number"));
         match self {
+            Field::CustomFontSize => number("Size"),
             Field::FontSize => number("Font size"),
             Field::FadeMs => number("Fade-out"),
             Field::CrossfadeMs => number("Crossfade"),
@@ -483,6 +493,7 @@ impl Field {
     fn apply(self, model: &mut Model, text: &str) {
         let n = || text.trim().parse::<u32>().unwrap_or(0);
         match self {
+            Field::CustomFontSize => model.settings_mut().font_size = n().min(1000) as i32,
             Field::FontSize => model.settings_mut().pe_fontsize = n().min(1000) as i32,
             Field::FadeMs => model.settings_mut().fade_ms = n(),
             Field::CrossfadeMs => model.settings_mut().crossfade_ms = n(),
@@ -515,6 +526,7 @@ impl FileTypes {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Section {
     Windows,
+    Interface,
     Playlist,
     Playback,
     Library,
@@ -524,12 +536,21 @@ enum Section {
 }
 
 impl Section {
-    const ALL: [Section; 7] =
-        [Section::Windows, Section::Playlist, Section::Playback, Section::Library, Section::Desktop, Section::Internet, Section::Shortcuts];
+    const ALL: [Section; 8] = [
+        Section::Windows,
+        Section::Interface,
+        Section::Playlist,
+        Section::Playback,
+        Section::Library,
+        Section::Desktop,
+        Section::Internet,
+        Section::Shortcuts,
+    ];
 
     fn label(self) -> &'static str {
         match self {
             Section::Windows => "Windows",
+            Section::Interface => "Interface",
             Section::Playlist => "Playlist",
             Section::Playback => "Playback",
             Section::Library => "Media Library",
@@ -544,6 +565,7 @@ impl Section {
             Section::Windows => {
                 &[Flag::Snap, Flag::EasyMove, Flag::KeepOnScreen, Flag::AlwaysOnTop, Flag::DoubleSize, Flag::SkinCursors, Flag::ScrollTitle]
             }
+            Section::Interface => &[Flag::CustomFont],
             Section::Playlist => &[Flag::DimInactive, Flag::ShowNumbers, Flag::ZeroPad],
             Section::Playback => &[Flag::AutoAdvance, Flag::KeepScanOpen],
             Section::Library => &[Flag::EnqueueDefault],
@@ -558,7 +580,7 @@ impl Section {
             Section::Playlist => &[Field::FontSize, Field::TitleFormat],
             Section::Playback => &[Field::FadeMs, Field::CrossfadeMs, Field::BufferMs, Field::SoundFont],
             Section::Internet => &[Field::Proxy],
-            Section::Windows | Section::Library | Section::Desktop | Section::Shortcuts => &[],
+            Section::Windows | Section::Interface | Section::Library | Section::Desktop | Section::Shortcuts => &[],
         }
     }
 }
@@ -578,6 +600,9 @@ pub struct Preferences {
     status: usize,
     /// The drop-downs of each shortcut row: window, mouse button, action.
     shortcut_rows: Vec<[usize; 3]>,
+    /// The fonts to choose from, by file name, and the drop-down that shows them.
+    fonts: Vec<String>,
+    font_choice: usize,
 }
 
 /// Shortcut rows on the Shortcuts page.
@@ -587,7 +612,7 @@ const SHORTCUT_ROWS: usize = 6;
 const DEVICE_ROWS: i32 = 4;
 
 impl Preferences {
-    fn new(s: &Settings, mut devices: Vec<Device>, file_types: FileTypes) -> Preferences {
+    fn new(s: &Settings, mut devices: Vec<Device>, file_types: FileTypes, font_files: Vec<std::path::PathBuf>) -> Preferences {
         let w = 560;
         let mut form = Form::new(w, 0);
         let labels = Section::ALL.map(|p| p.label().to_string()).to_vec();
@@ -598,11 +623,17 @@ impl Preferences {
         let mut type_checks = [0; 3];
         let mut device_list = 0;
         let mut shortcut_rows = Vec::new();
+        let mut fonts: Vec<String> = Vec::new();
+        let mut font_choice = 0;
         for (page, section) in Section::ALL.into_iter().enumerate() {
             let flags = section.flags();
             let rows = flags.len() as i32;
             // The shortcut rows sit inside the frame.
-            let inside = if section == Section::Shortcuts { 30 + SHORTCUT_ROWS as i32 * 30 } else { 0 };
+            let inside = match section {
+                Section::Shortcuts => 30 + SHORTCUT_ROWS as i32 * 30,
+                Section::Interface => 62,
+                _ => 0,
+            };
             form.add_on(page, Rect::new(x0, 10, cw, 22 + rows * 22 + inside), Widget::Group { label: section.label().into() });
             for (n, &f) in flags.iter().enumerate() {
                 form.add_on(
@@ -631,6 +662,33 @@ impl Preferences {
                     device_list = form.add_on(page, Rect::new(x0 + 140, y, cw - 140, DEVICE_ROWS * ROW_H + 4), list);
                     form.set_rows(device_list, devices.iter().map(|d| d.label.clone()).collect(), current);
                     y += DEVICE_ROWS * ROW_H + 10;
+                }
+                Section::Interface => {
+                    // A font from a `fonts` folder, and its size beside it.
+                    fonts = font_files.iter().filter_map(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned()).collect();
+                    if !s.font_file.is_empty() && !fonts.iter().any(|f| *f == s.font_file) {
+                        // Taken out of the folder: kept until another is chosen.
+                        fonts.push(format!("{} (not found)", s.font_file));
+                    }
+                    let current = fonts.iter().position(|f| *f == s.font_file || *f == format!("{} (not found)", s.font_file));
+                    let options = if fonts.is_empty() { vec!["(no fonts in the fonts folder)".to_string()] } else { fonts.clone() };
+                    font_choice = form.add_on(
+                        page,
+                        Rect::new(x0 + 12, y, cw - 24 - 100, 24),
+                        Widget::Choice { options, selected: current.unwrap_or(0) },
+                    );
+                    form.add_on(
+                        page,
+                        Rect::new(x0 + cw - 12 - 92, y, 36, 24),
+                        Widget::Label { text: Field::CustomFontSize.label().into(), dim: false },
+                    );
+                    let text = Field::CustomFontSize.get(s);
+                    let cursor = text.chars().count();
+                    let size = form.add_on(page, Rect::new(x0 + cw - 12 - 52, y, 52, 24), Widget::Input { text, cursor });
+                    fields.push((Field::CustomFontSize, size));
+                    let note = "Fonts (.ttf, .otf) go in the fonts folder.";
+                    form.add_on(page, Rect::new(x0 + 12, y + 32, cw - 24, 20), Widget::Label { text: note.into(), dim: true });
+                    y += 60 + 120;
                 }
                 Section::Shortcuts => {
                     let note = "A click, or the wheel, over a title bar (full size or shaded):";
@@ -708,6 +766,8 @@ impl Preferences {
             device_list,
             status,
             shortcut_rows,
+            fonts,
+            font_choice,
         }
     }
 
@@ -756,7 +816,16 @@ impl Preferences {
             })
             .collect();
         model.settings_mut().title_shortcuts = shortcuts::format(&rules);
+        let (was_file, was_size) = (model.settings().font_file.clone(), model.settings().font_size);
+        if let Some(name) = self.fonts.get(self.form.choice(self.font_choice)) {
+            if !name.ends_with(" (not found)") {
+                model.settings_mut().font_file = name.clone();
+            }
+        }
         model.settings_mut().sanitize();
+        if model.settings().custom_font && (model.settings().font_file.clone(), model.settings().font_size) != (was_file, was_size) {
+            model.ui.push(UiReq::SkinChanged);
+        }
         model.push_engine_settings();
         #[cfg(feature = "plugins")]
         if model.settings().proxy != proxy {
@@ -1230,6 +1299,35 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn the_interface_page_chooses_a_custom_font_and_its_size() {
+        let mut m = songs(&[]);
+        let files = vec![std::path::PathBuf::from("/fonts/Alpha.ttf"), "/fonts/Beta.otf".into()];
+        let mut p = Panel::Prefs(Preferences::new(m.settings(), vec![], test_types("font"), files.clone()));
+        assert!(!m.settings().custom_font && m.settings().font_file.is_empty());
+        let r = check_box(&mut p, &mut m, Flag::CustomFont);
+        click(&mut p, &mut m, r);
+        assert!(m.settings().custom_font);
+        assert!(m.ui.iter().any(|r| matches!(r, UiReq::SkinChanged)), "the windows redraw with it");
+        m.ui.clear();
+        let Panel::Prefs(pr) = &p else { unreachable!() };
+        let choice = pr.font_choice;
+        pick(&mut p, &mut m, choice, 1);
+        retype(&mut p, &mut m, Field::CustomFontSize, "15");
+        assert!(!press(&mut p, &mut m, Key::Enter));
+        assert_eq!((m.settings().font_file.as_str(), m.settings().font_size), ("Beta.otf", 15));
+        assert_eq!(m.settings().list_font_px(), 15, "the playlist text takes the custom size");
+        assert!(m.ui.iter().any(|r| matches!(r, UiReq::SkinChanged)));
+
+        // Shown again, and a font that left the folder is kept.
+        let p = Panel::Prefs(Preferences::new(m.settings(), vec![], test_types("font2"), files[..1].to_vec()));
+        let Panel::Prefs(pr) = &p else { unreachable!() };
+        assert_eq!(pr.fonts, ["Alpha.ttf", "Beta.otf (not found)"]);
+        assert_eq!(pr.form.choice(pr.font_choice), 1);
+        m.settings_mut().custom_font = false;
+        assert_eq!(m.settings().list_font_px(), 10, "off: the playlist font size is used");
+    }
+
+    #[test]
     fn the_shortcuts_page_saves_what_is_picked_and_shows_it_again() {
         let mut m = songs(&[]);
         let mut p = Panel::open(PanelKind::Preferences, &m);
@@ -1258,7 +1356,6 @@ pub(crate) mod tests {
         assert_eq!(picked(pr.shortcut_rows[1]), [0, 0, 2]);
         assert_eq!(picked(pr.shortcut_rows[2]), [0, 0, 0], "the others are empty");
     }
-
 
     #[test]
     fn each_section_shows_only_its_own_controls() {
@@ -1334,14 +1431,14 @@ pub(crate) mod tests {
     fn prefs_with_devices(m: &Model) -> Panel {
         let cards =
             vec![device("default", "Default device"), device("hdmi:CARD=NVidia,DEV=0", "HDMI"), device("front:CARD=Audio,DEV=0", "USB")];
-        Panel::Prefs(Preferences::new(m.settings(), cards, test_types("devices")))
+        Panel::Prefs(Preferences::new(m.settings(), cards, test_types("devices"), vec![]))
     }
 
     #[cfg(target_os = "macos")]
     #[test]
     fn preferences_say_where_a_mac_chooses_the_player() {
         let m = songs(&[]);
-        let p = Panel::Prefs(Preferences::new(m.settings(), vec![], test_types("mac")));
+        let p = Panel::Prefs(Preferences::new(m.settings(), vec![], test_types("mac"), vec![]));
         let Panel::Prefs(pr) = &p else { unreachable!() };
         assert!(pr.form.labels().iter().any(|l| l.starts_with("Choose Popamp in Finder")));
     }
@@ -1372,14 +1469,14 @@ pub(crate) mod tests {
         let mut m = songs(&[]);
         let types = test_types("ok");
         let root = types.config.parent().unwrap().to_path_buf();
-        let mut p = Panel::Prefs(Preferences::new(m.settings(), vec![], types));
+        let mut p = Panel::Prefs(Preferences::new(m.settings(), vec![], types, vec![]));
         let r = type_check(&mut p, &mut m, Group::Playlists);
         click(&mut p, &mut m, r);
         assert!(!root.exists(), "nothing written before OK");
         assert!(!press(&mut p, &mut m, Key::Enter));
         let Panel::Prefs(pr) = &p else { unreachable!() };
         assert_eq!(pr.file_types.defaults(), [false, true, false]);
-        let reopened = Panel::Prefs(Preferences::new(m.settings(), vec![], test_types_at(&root)));
+        let reopened = Panel::Prefs(Preferences::new(m.settings(), vec![], test_types_at(&root), vec![]));
         let Panel::Prefs(pr) = &reopened else { unreachable!() };
         assert!(pr.form.checked(pr.type_checks[1]) && !pr.form.checked(pr.type_checks[0]), "shown ticked next time");
         let _ = std::fs::remove_dir_all(root);
@@ -1396,7 +1493,7 @@ pub(crate) mod tests {
         let mut m = songs(&[]);
         let types = test_types("cancel");
         let root = types.config.parent().unwrap().to_path_buf();
-        let mut p = Panel::Prefs(Preferences::new(m.settings(), vec![], types));
+        let mut p = Panel::Prefs(Preferences::new(m.settings(), vec![], types, vec![]));
         let r = type_check(&mut p, &mut m, Group::Audio);
         click(&mut p, &mut m, r);
         assert!(!press(&mut p, &mut m, Key::Escape));

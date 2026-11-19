@@ -2,7 +2,7 @@
 //! fonts that have a character the font in use lacks.
 
 use objc2_core_foundation::{CFRange, CFRetained, CFString, CFURL};
-use objc2_core_text::{kCTFontURLAttribute, CTFont};
+use objc2_core_text::{CTFont, kCTFontURLAttribute};
 use std::path::PathBuf;
 
 /// The Mac font a generic family name stands for; other names as they are.

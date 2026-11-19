@@ -196,7 +196,7 @@ impl SkinWin {
     }
 
     fn row_h(model: &Model) -> i32 {
-        model.settings().pe_fontsize + 3
+        model.settings().list_font_px() + 3
     }
 
     fn visible_rows(&self, model: &Model) -> usize {
@@ -463,7 +463,7 @@ impl SkinWin {
         b.fill(list.x, list.y, list.w, list.h, colors.normal_bg);
         let s = model.settings();
         let row_h = Self::row_h(model);
-        let px = s.pe_fontsize as u32;
+        let px = s.list_font_px() as u32;
         let digits = model.playlist.len().max(1).to_string().len();
         let current = model.playlist.current();
         let scroll = self.scroll(model);
@@ -811,7 +811,7 @@ pub fn image_mask(model: &Model, mode: &Mode, size: (i32, i32), drawn: Scale, sh
 
 /// Where a library element with `thumb`, at `r`, puts the library.
 fn place(model: &Model, r: Rect, thumb: &Look) -> Place {
-    Place { r, px: model.settings().pe_fontsize, thumb: thumb.normal.map(|p| (p.src.w, p.src.h)) }
+    Place { r, px: model.settings().list_font_px(), thumb: thumb.normal.map(|p| (p.src.w, p.src.h)) }
 }
 
 fn draw_paint(b: &mut Canvas, skin: &Skin, p: Paint, r: Rect, fill: Fill) {

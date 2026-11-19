@@ -116,6 +116,9 @@
     even when the icon is otherwise off. On Linux, notifications of each
     new track with its cover, off by default. Both are in Preferences >
     Desktop.
+  - Custom font (Preferences > Interface): any TrueType or OpenType font
+    from the `fonts` folder beside the program for the playlist, the
+    library, menus, dialogs and a vector skin's texts, at a size you type.
   - Title-bar shortcuts (Preferences > Shortcuts): a right or middle click
     on the title bar of the main, equalizer or playlist window (full size
     or shaded) can go to the previous or next track, pause, stop or switch

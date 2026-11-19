@@ -276,6 +276,13 @@ settings! {
     /// without a set of this name shows its first.
     skin_colors: String = String::new(),
     usecursors: bool = true,
+    /// Draw the text of the player (the playlist, the library, menus and
+    /// dialogs, and a vector skin's texts) with `font_file`.
+    custom_font: bool = false,
+    /// The file name of the custom font, in a `fonts` folder.
+    font_file: String = String::new(),
+    /// The custom font's size in pixels, for the playlist and the library.
+    font_size: i32 = 12,
     /// What a right or middle click on a window's title bar does, as
     /// `window:button:action` rules joined by `;` (Preferences > Shortcuts).
     title_shortcuts: String = String::new(),
@@ -312,6 +319,16 @@ settings! {
 
 impl Settings {
     /// Brings every value into its allowed range.
+    /// The size of the playlist's and the library's text: the custom
+    /// font's, when there is one.
+    pub fn list_font_px(&self) -> i32 {
+        if self.custom_font {
+            self.font_size
+        } else {
+            self.pe_fontsize
+        }
+    }
+
     pub fn sanitize(&mut self) {
         self.volume = self.volume.clamp(0, 255);
         self.balance = self.balance.clamp(-127, 127);
@@ -321,6 +338,7 @@ impl Settings {
         self.ml_width = self.ml_width.max(275);
         self.ml_height = self.ml_height.max(116);
         self.pe_fontsize = self.pe_fontsize.clamp(6, 40);
+        self.font_size = self.font_size.clamp(6, 40);
         self.snaplen = self.snaplen.clamp(0, 100);
         self.zoom = self.zoom.clamp(125, 300);
         self.bar_zoom = self.bar_zoom.clamp(100, 300);
@@ -467,6 +485,15 @@ impl Paths {
     /// The user's skins folder, where skins are installed to.
     pub fn skins_dir(&self) -> PathBuf {
         self.data_dir.join("skins")
+    }
+    /// The user's fonts folder.
+    pub fn fonts_dir(&self) -> PathBuf {
+        self.data_dir.join("fonts")
+    }
+    /// Every folder fonts are read from, the user's first, as for skins:
+    /// also the `fonts` folder beside the program.
+    pub fn fonts_dirs(&self) -> Vec<PathBuf> {
+        self.with_shared("fonts")
     }
     /// The user's plug-ins folder.
     pub fn plugins_dir(&self) -> PathBuf {

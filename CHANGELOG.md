@@ -8,6 +8,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **A custom font** (Preferences > Interface): tick *Custom font*, pick a
+  `.ttf`, `.otf` or `.ttc` file from the `fonts` folder next to the program
+  (or the one in your user data folder) and type a size. The font draws the
+  text of the playlist, the library, the menus, the dialogs and a vector
+  skin's texts; the size is that of the playlist and library lists. The
+  settings are `custom_font`, `font_file` and `font_size`. Classic skins'
+  own bitmap lettering is not changed.
 - **Windowshade for the Media Library:** a double click on the library
   window's title bar rolls it up to its title strip, and another unrolls
   it, as with the other windows. A classic skin also has the shade button

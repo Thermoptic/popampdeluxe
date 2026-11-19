@@ -170,7 +170,7 @@ pub struct App {
 
 impl App {
     pub fn new(model: Model, start_minimized: bool, media: crate::media::Controls, hotkeys: crate::hotkeys::Hotkeys) -> App {
-        let fonts = Fonts::for_skin(&model.skin);
+        let fonts = Fonts::new(&model.skin, model.custom_font().as_deref());
         App {
             model,
             fonts,
@@ -1846,7 +1846,7 @@ impl App {
                 }
                 UiReq::SkinChanged => {
                     self.remake_changed_windows(el);
-                    self.fonts = Fonts::for_skin(&self.model.skin);
+                    self.fonts = Fonts::new(&self.model.skin, self.model.custom_font().as_deref());
                     self.build_cursors(el);
                     for k in WindowKey::ALL {
                         if let Some(w) = self.win_mut(k) {
