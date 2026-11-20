@@ -34,6 +34,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Single-click playlist buttons** (Preferences > Playlist): off by default. When
+  ticked, the picture buttons ADD, REM, SEL, MISC and LIST (and the library's
+  LIST) work in one go: press and hold on a button and its menu folds out with
+  the item under the mouse pressed in; drag over the other items, which are
+  pressed in as the mouse passes them; nothing is done until the mouse button
+  is let go, and then the item under the mouse is chosen. A click without
+  moving chooses the item that is over the button (ADD: add files). Let go
+  off the menu to do nothing. Off, a click leaves the menu open, as before.
 - **Hotkeys** (Preferences > Hotkeys): every keyboard shortcut of the player is
   listed, the names of the commands in a column at the left and their keys in
   one at the right, and can be changed: pick one, press *Change* and then the new keys

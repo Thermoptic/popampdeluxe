@@ -21,6 +21,29 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-20   SINGLE-CLICK PLAYLIST BUTTONS
+  ..........................................................................
+
+  Preferences > Playlist > Single-click playlist buttons
+
+  Off (the default): a click on ADD, REM, SEL, MISC or LIST folds the menu
+  out and leaves it open, and you click an item. Holding the button down and
+  letting go on an item works too.
+
+  Ticked: the buttons work in one go, like the buttons of the classic
+  Winamp.
+
+     1. Press the mouse button down on a button and hold it. The button
+        is pressed in and the menu folds out.
+     2. Drag the mouse over the other items. Each one is pressed in while
+        the mouse is over it. Nothing is done yet.
+     3. Let go of the mouse button. Now the item under the mouse is pressed
+        for real, and its choice is made. Let go off the menu to do nothing.
+
+  A click without moving the mouse chooses the item that sits over the
+  button (ADD: add files).
+
+
   2026-11-20   HOTKEYS: CHANGE THE KEYBOARD SHORTCUTS
   ..........................................................................
 

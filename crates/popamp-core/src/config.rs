@@ -240,6 +240,10 @@ settings! {
     /// windows are: 200 makes it as thick as jetAudio's bar.
     bar_zoom: i32 = 200,
     dim_inactive: bool = true,
+    /// The picture buttons of the playlist and the library (ADD, REM, SEL,
+    /// MISC, LIST) work in one go: press and hold, drag to an item, let go
+    /// to choose it. Off, a click leaves the menu open to click an item.
+    pl_single_click: bool = false,
     // Main window.
     timeleftmode: bool = false,
     autoscrollname: bool = true,

@@ -634,6 +634,11 @@ impl SkinWin {
             Kind::Popup { .. } => {
                 self.popup = Some(((shade, i), None));
                 self.pressed = Some((shade, i));
+                if model.settings().pl_single_click {
+                    // Held down: the item under the mouse is pressed in at once.
+                    let under = self.popup_hit(model, ev.x, ev.y).map(|(k, _)| k);
+                    self.popup = Some(((shade, i), under));
+                }
                 Out::Capture
             }
             Kind::Resize => Out::BeginResize,
@@ -702,7 +707,7 @@ impl SkinWin {
         if let Some(((_, at), _)) = self.popup {
             // Released on the button that opened it, even under an item that
             // covers it: a click, so the popup stays open.
-            if pressed == Some(at) && self.hit(model, ev.x, ev.y) == Some(at) {
+            if !model.settings().pl_single_click && pressed == Some(at) && self.hit(model, ev.x, ev.y) == Some(at) {
                 return Out::Redraw;
             }
             if let Some((_, item)) = self.popup_hit(model, ev.x, ev.y) {
@@ -1164,6 +1169,34 @@ mod tests {
         w.mouse_up(&mut m, &input(200, 40));
         assert!(!w.popup_open());
         assert_eq!(selected(&m), [0, 1, 2]);
+    }
+
+    #[test]
+    fn single_click_buttons_choose_on_release_whatever_is_under_the_mouse() {
+        let (mut m, mut w) = playlist(3);
+        m.settings_mut().pl_single_click = true;
+        // Pressed on SEL: the item over the button is pressed in at once, and
+        // is the one chosen when the mouse is let go without moving.
+        assert!(matches!(w.mouse_down(&mut m, &input(80, 100)), Out::Capture));
+        assert!(w.popup_open());
+        assert_eq!(w.popup.map(|p| p.1), Some(Some(0)), "pressed in: the item under the mouse");
+        w.mouse_up(&mut m, &input(80, 100));
+        assert!(!w.popup_open(), "let go: done");
+        assert_eq!(selected(&m), [0, 1, 2], "Select all, the item that was over the button");
+        // Held, dragged over another item (it is pressed in) and let go there.
+        m.playlist.select_all(false);
+        w.mouse_down(&mut m, &input(80, 100));
+        assert!(w.mouse_move(&mut m, 80, 86 - 36 + 5));
+        assert_eq!(w.popup.map(|p| p.1), Some(Some(2)), "the one the mouse is over is pressed in");
+        assert_eq!(selected(&m), [] as [usize; 0], "nothing is done until the mouse is let go");
+        w.mouse_up(&mut m, &input(80, 86 - 36 + 5));
+        assert_eq!(selected(&m), [0, 1, 2], "Invert selection");
+        // Let go off the menu: nothing.
+        m.playlist.select_all(false);
+        w.mouse_down(&mut m, &input(80, 100));
+        w.mouse_up(&mut m, &input(200, 40));
+        assert!(!w.popup_open());
+        assert_eq!(selected(&m), [] as [usize; 0]);
     }
 
     #[test]
