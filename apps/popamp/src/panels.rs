@@ -644,7 +644,7 @@ impl Preferences {
             let rows = flags.len() as i32;
             // The shortcut rows sit inside the frame.
             let inside = match section {
-                Section::Shortcuts => 30 + SHORTCUT_ROWS as i32 * 30,
+                Section::Shortcuts => 11 + SHORTCUT_ROWS as i32 * 30,
                 Section::Interface => 62,
                 _ => 0,
             };
@@ -715,8 +715,9 @@ impl Preferences {
                 }
                 Section::Shortcuts => {
                     let note = "A click, or the wheel, over a title bar (full size or shaded):";
-                    form.add_on(page, Rect::new(x0 + 4, y - 6, cw - 8, 20), Widget::Label { text: note.into(), dim: true });
-                    y += 22;
+                    form.add_on(page, Rect::new(x0 + 4, 15, cw - 8, 20), Widget::Label { text: note.into(), dim: true });
+                    // The first row sits 27 below the top of the frame.
+                    y = 37;
                     let names = |v: Vec<&str>| v.into_iter().map(String::from).collect::<Vec<_>>();
                     let windows = names(shortcuts::TARGETS.iter().map(|t| t.2).collect());
                     let buttons = names(shortcuts::CLICKS.iter().map(|t| t.2).collect());
