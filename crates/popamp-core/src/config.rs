@@ -9,6 +9,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 pub const SECTION: &str = "Popamp";
+/// The section of the Media Library folder tree: its groups and folders.
+const FOLDER_TREE: &str = "FolderTree";
 pub const DEFAULT_TITLE_FORMAT: &str = "[%artist% - ]$if2(%title%,$filepart(%filename%))";
 
 pub trait IniValue: Sized {
@@ -586,6 +588,28 @@ impl Config {
 
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    /// The folder tree of the Media Library as lines (`[FolderTree]`, keys
+    /// `item1`, `item2`, ...), in order; none when it was never saved.
+    pub fn folder_tree(&self) -> Option<Vec<String>> {
+        if !self.ini.has_section(FOLDER_TREE) {
+            return None;
+        }
+        Some((1..).map_while(|n| self.ini.get(FOLDER_TREE, &format!("item{n}"))).map(String::from).collect())
+    }
+
+    /// Replaces the folder tree kept in the ini file.
+    pub fn set_folder_tree(&mut self, lines: &[String]) {
+        let mut n = 1;
+        while self.ini.remove(FOLDER_TREE, &format!("item{n}")).is_some() {
+            n += 1;
+        }
+        // An empty tree still has its section: it was saved, not never saved.
+        self.ini.set(FOLDER_TREE, "items", lines.len().to_string());
+        for (i, line) in lines.iter().enumerate() {
+            self.ini.set(FOLDER_TREE, &format!("item{}", i + 1), line.clone());
+        }
     }
 
     /// A copy of the plug-ins' settings and grants, for a loading thread.

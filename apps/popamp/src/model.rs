@@ -260,7 +260,11 @@ impl Model {
         let format = Format::cached(&config.settings.titlefmt);
         let library = crate::library::LibraryPane::new(popamp_core::library::Library::load(&paths.library_file()));
         let mut library = library;
-        library.tree = crate::foldertree::FolderTree::load(&paths.foldertree_file());
+        // The tree is kept in the ini file; the file of folders it was kept in before is read once.
+        library.tree = match config.folder_tree() {
+            Some(lines) => crate::foldertree::FolderTree::from_lines(&lines),
+            None => crate::foldertree::FolderTree::load(&paths.foldertree_file()),
+        };
         library.tree_mode = config.settings.ml_foldertree;
         library.tree.hide_ext = config.settings.ml_hide_ext;
         let skin = Skin::builtin_vector(Some(&config.settings.skin_colors));
@@ -522,6 +526,7 @@ impl Model {
     }
 
     pub fn save_session(&mut self) {
+        self.sync_tree();
         self.settings_mut().plpos = self.playlist.current().unwrap_or(0) as i32;
         if let Err(e) = self.save_playlist_file(&self.paths.playlist_file()) {
             log::warn!("cannot save playlist: {e}");
@@ -1234,6 +1239,7 @@ impl Model {
             C::PlaylistSave => self.request_dialog(DialogKind::SavePlaylist),
             C::JumpToTime => self.request_dialog(DialogKind::JumpToTime),
             C::JumpToFile => self.ui.push(UiReq::Panel(PanelKind::JumpToFile)),
+            C::LibraryEditFolders => self.ui.push(UiReq::Panel(PanelKind::FolderEditor)),
             C::FileInfo => self.ui.push(UiReq::Panel(PanelKind::FileInfo)),
             C::PlGenerateHtml => self.request_dialog(DialogKind::SaveHtml),
             C::PlCopyToClipboard => self.copy_playlist_to_clipboard(),

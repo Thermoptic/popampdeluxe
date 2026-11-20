@@ -929,6 +929,9 @@ impl App {
             WindowEvent::CursorMoved { position, .. } => {
                 // Dialog pixels, from the top of the form; above it is the title bar.
                 p.cursor = (crate::pen::dialog(p.pct, position.x as i32), crate::pen::dialog(p.pct, position.y as i32) - p.bar_h);
+                if p.panel.mouse_drag(p.cursor.0, p.cursor.1) {
+                    self.render_panel(i);
+                }
                 return;
             }
             WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } if y < 0 => {
@@ -945,9 +948,15 @@ impl App {
                 let now = Instant::now();
                 let double = p.last_click.is_some_and(|(t, at)| now - t < Duration::from_millis(400) && at == (x, y));
                 p.last_click = Some((now, (x, y)));
-                form.mouse_down(x, y, double)
+                let ev = form.mouse_down(x, y, double);
+                p.panel.mouse_press(x, y);
+                ev
             }
-            WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => form.mouse_up(x, y),
+            WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => {
+                let ev = form.mouse_up(x, y);
+                p.panel.mouse_release();
+                ev
+            }
             WindowEvent::MouseWheel { delta, .. } => {
                 form.wheel(match delta {
                     MouseScrollDelta::LineDelta(_, y) => y.round() as i32,

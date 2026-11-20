@@ -21,6 +21,40 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-20   GROUPS IN THE FOLDERTREE, AND A FOLDER AND GROUP EDITOR
+  ..........................................................................
+
+  In the Media Library Foldertree, the left column can now have groups.
+
+     * A group looks like an empty folder. It holds folders, to organise
+       them. The folders in a group have a small "L" in front, as in a
+       tree view.
+     * Click a group to fold its folders out; click again to fold them in.
+     * Click a folder (in or out of a group) to see its files at the right.
+
+  Folder and Group Editor: press the LIST button (bottom right of the
+  Media Library) and choose "Folders and groups...". In it you can
+
+     * Add folder, Add group, Remove
+     * change the name and the path of the picked row (the Name and Path
+       boxes), which also renames groups
+     * Move up / Move down, Into group / Out of group
+     * drag a row with the mouse to put it where you want it; a folder
+       dropped under a group or one of its folders goes into the group
+     * OK keeps all this, Cancel forgets it
+
+  Everything is kept in popamp.ini, in a section of its own:
+
+     [FolderTree]
+     item1=folder|0||D:\Music\Bonkers
+     item2=group|1|Play
+     item3=folder|1|Music|D:\Music\Music
+
+  A group is "group|<1 unfolded, 0 folded>|<name>". A folder is
+  "folder|<1 in the group above>|<name, may be empty>|<path>". The old
+  foldertree.txt is read once if the ini file has no tree yet.
+
+
   2026-11-20   PREFERENCES WITH THE SKIN'S TITLE BAR
   ..........................................................................
 
@@ -70,9 +104,9 @@
   Preferences > Media Library > Media Library Foldertree
 
   Playlist files (.m3u, .m3u8, .pls, .xspf) in your folders now show in the
-  right list, next to the songs. They show an icon of their own, so you can tell
-  them from songs. Double-click one and every song in it is added to the
-  playlist window (or played, as set for double-click).
+  right list, next to the songs. They show an icon of their own, so you can
+  tell them from songs. Double-click one and every song in it is added to
+  the playlist window (or played, as set for double-click).
 
 
   2026-11-19   COPY THE PLAYLIST'S FILES TO THE CLIPBOARD

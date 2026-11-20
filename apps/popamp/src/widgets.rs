@@ -240,6 +240,30 @@ impl<A: Copy + PartialEq> Form<A> {
         }
     }
 
+    /// Sets the text of field `i`, the caret at its end.
+    pub fn set_text(&mut self, i: usize, new: &str) {
+        if let Widget::Input { text, cursor } = &mut self.controls[i].1 {
+            *text = new.to_string();
+            *cursor = new.chars().count();
+        }
+    }
+
+    /// The row of list `i` at `(x, y)`, when that is on a row.
+    pub fn list_row_at(&self, i: usize, x: i32, y: i32) -> Option<usize> {
+        let (r, Widget::List { rows, .. }) = (&self.controls[i].0, &self.controls[i].1) else { return None };
+        r.contains(x, y).then(|| self.list_row_near(i, y)).flatten().filter(|&n| n < rows.len())
+    }
+
+    /// The row of list `i` nearest height `y`: the first above the list, the last below it.
+    pub fn list_row_near(&self, i: usize, y: i32) -> Option<usize> {
+        let Widget::List { rows, scroll, .. } = &self.controls[i].1 else { return None };
+        if rows.is_empty() {
+            return None;
+        }
+        let n = (y - self.controls[i].0.y - 2).div_euclid(ROW_H) + *scroll as i32;
+        Some(n.clamp(0, rows.len() as i32 - 1) as usize)
+    }
+
     /// Appends rows to list `i`, keeping the selection and scroll.
     pub fn push_rows(&mut self, i: usize, more: impl IntoIterator<Item = String>) {
         if let Widget::List { rows, .. } = &mut self.controls[i].1 {

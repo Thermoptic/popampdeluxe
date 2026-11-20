@@ -8,6 +8,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Groups in the Media Library folder tree.** A group is a folder-like heading
+  in the left list, with a picture of its own. Folders in a group hang under it
+  with a small L; a click on the group folds them in or out. The Folder and
+  Group Editor (LIST button, bottom right > *Folders and groups...*) adds,
+  removes and renames groups and folders, changes a folder's path, and moves
+  rows with Move up/down, Into/Out of group, or by dragging. The tree is kept
+  in `popamp.ini`, section `[FolderTree]` (it was `foldertree.txt`, which is
+  still read once if the ini has no tree).
 - **Preferences has the skin's title bar**: instead of the system's, the window
   has the windowshade strip of the skin in use, with the window's name in the
   middle and a close button. Drag the bar to move the window.

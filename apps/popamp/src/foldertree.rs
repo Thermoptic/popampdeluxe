@@ -52,10 +52,81 @@ pub struct Entry {
     pub modified: Option<SystemTime>,
 }
 
+/// A line of the left list: a group, or a folder that may be in a group.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Item {
+    /// A heading that folds the folders under it in and out.
+    Group { name: String, open: bool },
+    /// A folder. `name` is what the list says, or empty for the folder's own
+    /// name; `child`: it is in the group above it.
+    Folder { path: String, name: String, child: bool },
+}
+
+impl Item {
+    pub fn is_folder(&self) -> bool {
+        matches!(self, Item::Folder { .. })
+    }
+
+    /// What the list says.
+    pub fn label(&self) -> String {
+        match self {
+            Item::Group { name, .. } => name.clone(),
+            Item::Folder { name, .. } if !name.is_empty() => name.clone(),
+            Item::Folder { path, .. } => label(path),
+        }
+    }
+
+    /// The line it is kept as in the ini file: `group|1|Name` (1: unfolded)
+    /// or `folder|1|Name|path` (1: in a group).
+    pub fn line(&self) -> String {
+        match self {
+            Item::Group { name, open } => format!("group|{}|{name}", u8::from(*open)),
+            Item::Folder { path, name, child } => format!("folder|{}|{name}|{path}", u8::from(*child)),
+        }
+    }
+
+    pub fn parse(line: &str) -> Option<Item> {
+        let (kind, rest) = line.trim().split_once('|')?;
+        match kind {
+            "group" => {
+                let (open, name) = rest.split_once('|')?;
+                Some(Item::Group { name: name.trim().to_string(), open: open != "0" })
+            }
+            "folder" => {
+                let mut parts = rest.splitn(3, '|');
+                let (child, name, path) = (parts.next()?, parts.next()?, parts.next()?);
+                (!path.trim().is_empty()).then(|| Item::Folder { path: path.trim().to_string(), name: name.trim().to_string(), child: child != "0" })
+            }
+            _ => None,
+        }
+    }
+}
+
+/// A name as the ini file can keep it: one line, no bars.
+pub fn clean_name(name: &str) -> String {
+    name.replace(['|', '\n', '\r'], " ").trim().to_string()
+}
+
+/// Makes the list hold together: a folder is in a group only when a group
+/// (or a folder of it) is just above.
+pub fn normalize(items: &mut [Item]) {
+    let mut inside = false;
+    for it in items {
+        match it {
+            Item::Group { .. } => inside = true,
+            Item::Folder { child, .. } => {
+                *child = *child && inside;
+                inside = *child;
+            }
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct FolderTree {
-    /// The folders of the left list.
-    pub roots: Vec<String>,
+    /// The groups and folders of the left list.
+    pub items: Vec<Item>,
+    /// The picked folder, by its place in `items`.
     root: Option<usize>,
     /// The folder the right list shows: the root or one inside it.
     dir: Option<PathBuf>,
@@ -87,6 +158,11 @@ fn is_list(e: &Entry) -> bool {
 }
 
 /// The name of the last part of `path`.
+pub fn path_label(path: &str) -> String {
+    label(path)
+}
+
+/// The name of the last part of `path`.
 fn label(path: &str) -> String {
     Path::new(path).file_name().map_or_else(|| path.to_string(), |n| n.to_string_lossy().into_owned())
 }
@@ -103,58 +179,136 @@ fn slot(list: List) -> usize {
 }
 
 impl FolderTree {
-    /// The folders kept in `file`, one to a line.
+    /// The folders kept in `file`, one to a line: how they were kept before
+    /// the groups, and still read when the ini file has no tree yet.
     pub fn load(file: &Path) -> FolderTree {
-        let mut tree = FolderTree::default();
-        for line in std::fs::read_to_string(file).unwrap_or_default().lines().map(str::trim).filter(|l| !l.is_empty()) {
-            if !tree.roots.iter().any(|r| r == line) {
-                tree.roots.push(line.to_string());
-            }
-        }
-        if !tree.roots.is_empty() {
-            tree.pick_root(0);
-        }
+        let text = std::fs::read_to_string(file).unwrap_or_default();
+        let lines: Vec<String> = text.lines().map(str::trim).filter(|l| !l.is_empty()).map(|l| format!("folder|0||{l}")).collect();
+        FolderTree::from_lines(&lines)
+    }
+
+    /// The tree kept as `lines` (see [`Item::line`]).
+    pub fn from_lines(lines: &[String]) -> FolderTree {
+        let mut tree = FolderTree { items: lines.iter().filter_map(|l| Item::parse(l)).collect(), ..FolderTree::default() };
+        normalize(&mut tree.items);
+        tree.pick_first();
         tree
     }
 
-    pub fn save(&self, file: &Path) -> std::io::Result<()> {
-        if let Some(dir) = file.parent() {
-            std::fs::create_dir_all(dir)?;
+    pub fn lines(&self) -> Vec<String> {
+        self.items.iter().map(Item::line).collect()
+    }
+
+    fn pick_first(&mut self) {
+        match self.items.iter().position(Item::is_folder) {
+            Some(i) => self.pick_root(i),
+            None => {
+                (self.root, self.dir) = (None, None);
+                self.reload();
+            }
         }
-        std::fs::write(file, self.roots.join("\n") + "\n")
+    }
+
+    /// Whether any folder is added.
+    pub fn has_folders(&self) -> bool {
+        self.items.iter().any(Item::is_folder)
+    }
+
+    /// The paths of the folders, in order.
+    pub fn folders(&self) -> Vec<&str> {
+        self.items
+            .iter()
+            .filter_map(|i| match i {
+                Item::Folder { path, .. } => Some(path.as_str()),
+                Item::Group { .. } => None,
+            })
+            .collect()
     }
 
     /// Adds `folder` to the left list and shows it. False when it is there already.
     pub fn add_root(&mut self, folder: &str) -> bool {
-        if let Some(i) = self.roots.iter().position(|r| r == folder) {
+        if let Some(i) = self.items.iter().position(|i| matches!(i, Item::Folder { path, .. } if path == folder)) {
             self.pick_root(i);
             return false;
         }
-        self.roots.push(folder.to_string());
-        self.pick_root(self.roots.len() - 1);
+        self.items.push(Item::Folder { path: folder.to_string(), name: String::new(), child: false });
+        self.pick_root(self.items.len() - 1);
         true
     }
 
     /// Takes the picked folder out of the left list; its files stay.
     pub fn remove_root(&mut self) {
         let Some(i) = self.root else { return };
-        self.roots.remove(i);
+        self.items.remove(i);
+        normalize(&mut self.items);
         self.scroll = [0, 0];
-        match self.roots.len() {
-            0 => (self.root, self.dir) = (None, None),
-            n => return self.pick_root(i.min(n - 1)),
+        let next = (i..self.items.len()).chain((0..i.min(self.items.len())).rev()).find(|&n| self.items[n].is_folder());
+        match next {
+            Some(n) => self.pick_root(n),
+            None => self.pick_first(),
         }
-        self.reload();
+    }
+
+    /// Puts `items` in the place of the list, keeping the folder on screen
+    /// when it is still there.
+    pub fn set_items(&mut self, mut items: Vec<Item>) {
+        normalize(&mut items);
+        let on = self.folder().map(String::from);
+        self.items = items;
+        let found = on.and_then(|p| self.items.iter().position(|i| matches!(i, Item::Folder { path, .. } if *path == p)));
+        match found {
+            Some(i) => {
+                self.root = Some(i);
+                self.reload();
+            }
+            None => self.pick_first(),
+        }
+    }
+
+    /// A row of the left list was picked: a group folds in or out, a folder shows.
+    fn pick_row(&mut self, n: usize) {
+        let Some(&i) = self.shown().get(n) else { return };
+        match self.items[i] {
+            Item::Group { ref mut open, .. } => *open = !*open,
+            Item::Folder { .. } if self.root != Some(i) => self.pick_root(i),
+            Item::Folder { .. } => {}
+        }
+    }
+
+    /// The places in `items` of the rows on screen: a folded group hides
+    /// the folders in it.
+    pub fn shown(&self) -> Vec<usize> {
+        let mut open = true;
+        let mut rows = Vec::new();
+        for (i, it) in self.items.iter().enumerate() {
+            match it {
+                Item::Group { open: o, .. } => {
+                    open = *o;
+                    rows.push(i);
+                }
+                Item::Folder { child: false, .. } => {
+                    open = true;
+                    rows.push(i);
+                }
+                Item::Folder { .. } if open => rows.push(i),
+                Item::Folder { .. } => {}
+            }
+        }
+        rows
     }
 
     /// The folder picked in the left list.
     pub fn folder(&self) -> Option<&str> {
-        self.root.and_then(|i| self.roots.get(i)).map(String::as_str)
+        match self.items.get(self.root?)? {
+            Item::Folder { path, .. } => Some(path),
+            Item::Group { .. } => None,
+        }
     }
 
     fn pick_root(&mut self, i: usize) {
+        let Some(Item::Folder { path, .. }) = self.items.get(i) else { return };
+        self.dir = Some(PathBuf::from(path));
         self.root = Some(i);
-        self.dir = self.roots.get(i).map(PathBuf::from);
         self.scroll[1] = 0;
         self.reload();
     }
@@ -264,7 +418,7 @@ impl FolderTree {
     // --- scrolling ------------------------------------------------------------
 
     fn len(&self, list: List) -> usize {
-        if list == List::Views { self.roots.len() } else { self.entries.len() }
+        if list == List::Views { self.shown().len() } else { self.entries.len() }
     }
 
     fn window(&self, p: &Parts, list: List) -> (usize, usize) {
@@ -352,18 +506,41 @@ impl FolderTree {
         pen.b.fill(r.x, r.y, r.w, r.h, c.normal_bg);
         pen.b.fill(p.views.x + p.views.w + p.bar_w + 1, p.views.y, 1, p.views.h, line);
 
-        // The folders added, at the left.
+        // The groups and folders added, at the left.
         let (scroll, page) = self.window(&p, List::Views);
-        for (n, root) in self.roots.iter().enumerate().skip(scroll).take(page) {
+        for (n, &i) in self.shown().iter().enumerate().skip(scroll).take(page) {
             let row = rect(p.views.x, p.views.y + (n - scroll) as i32 * p.row_h, p.views.w, p.row_h);
-            let on = self.root == Some(n);
+            let item = &self.items[i];
+            let on = self.root == Some(i);
             if on {
                 let shade = if active && self.focus == Some(List::Views) { c.selected_bg } else { mix(c.selected_bg, c.normal_bg, 0.5) };
                 pen.b.fill(row.x, row.y, row.w, row.h, shade);
             }
-            pen.left(row, &label(root), if on { c.current } else { c.normal });
+            let color = if on { c.current } else { c.normal };
+            let icon = pen.px as i32 + 6;
+            let (fx, fy) = (row.x + 5, row.y + (row.h - 6) / 2);
+            match item {
+                Item::Group { .. } => {
+                    // An empty folder: the group's own picture.
+                    pen.b.fill(fx, fy, 3, 1, color);
+                    pen.b.fill(fx, fy + 1, 8, 1, color);
+                    pen.b.fill(fx, fy + 2, 1, 3, color);
+                    pen.b.fill(fx + 7, fy + 2, 1, 3, color);
+                    pen.b.fill(fx, fy + 5, 8, 1, color);
+                }
+                Item::Folder { child: false, .. } => {
+                    pen.b.fill(fx, fy, 3, 1, color);
+                    pen.b.fill(fx, fy + 1, 8, 5, color);
+                }
+                Item::Folder { child: true, .. } => {
+                    // An L: this folder hangs under the group above.
+                    pen.b.fill(fx + 3, fy, 1, 3, color);
+                    pen.b.fill(fx + 3, fy + 3, 4, 1, color);
+                }
+            }
+            pen.left(rect(row.x + icon, row.y, (row.w - icon).max(0), row.h), &item.label(), color);
         }
-        if self.roots.is_empty() {
+        if self.items.is_empty() {
             pen.left(rect(p.views.x, p.views.y, p.views.w, p.row_h), "No folders yet", dim);
         }
 
@@ -426,7 +603,7 @@ impl FolderTree {
         pen.b.fill(t.header.x, t.header.y + t.header.h - 1, t.header.w, 1, pen.line);
         pen.b.fill(t.rows.x + t.rows.w + p.bar_w + 1, t.header.y, 1, t.header.h + t.rows.h, pen.line);
 
-        if self.roots.is_empty() {
+        if !self.has_folders() {
             pen.centre(rect(t.rows.x, t.rows.y + p.row_h, t.rows.w, p.row_h), "No folder is added.", pen.dim);
             pen.centre(rect(t.rows.x, t.rows.y + 2 * p.row_h, t.rows.w, p.row_h), "Press Add folder.", pen.dim);
             return;
@@ -529,9 +706,7 @@ impl FolderTree {
         }
         if let Some(n) = self.row_at(&p, List::Views, x, y) {
             self.focus = Some(List::Views);
-            if self.root != Some(n) {
-                self.pick_root(n);
-            }
+            self.pick_row(n);
             return Reaction::default();
         }
         self.press_entries(&p, at.px, (x, y), shift, ctrl, double)
@@ -660,8 +835,9 @@ impl FolderTree {
         if len == 0 {
             return;
         }
-        let cur = if list == List::Tracks { self.cursor } else { self.root.unwrap_or(0) };
-        let to = match key {
+        let rows = self.shown();
+        let cur = if list == List::Tracks { self.cursor } else { rows.iter().position(|&i| Some(i) == self.root).unwrap_or(0) };
+        let mut to = match key {
             Key::Up => cur.saturating_sub(1),
             Key::Down => cur + 1,
             Key::PageUp => cur.saturating_sub(page),
@@ -670,10 +846,19 @@ impl FolderTree {
             _ => len - 1,
         }
         .min(len - 1);
+        if list == List::Views {
+            // A group is no folder to show: go on to the nearest folder.
+            let up = to < cur || key == Key::Home;
+            let ok = |n: &usize| self.items[rows[*n]].is_folder();
+            let found = if up { (0..=to).rev().find(ok) } else { (to..len).find(ok) };
+            let Some(n) = found.or_else(|| if up { (to..len).find(ok) } else { (0..=to).rev().find(ok) }) else { return };
+            to = n;
+            self.pick_root(rows[to]);
+        }
         match list {
             List::Tracks if shift => self.select_range(to),
             List::Tracks => self.select_only(to),
-            _ => self.pick_root(to),
+            _ => {}
         }
         self.show_row(p, list, to);
     }
@@ -714,6 +899,72 @@ mod tests {
 
     fn row(p: &Parts, n: usize) -> (i32, i32) {
         (p.table.rows.x + 20, p.table.rows.y + n as i32 * p.row_h + 2)
+    }
+
+    fn grouped() -> (PathBuf, FolderTree) {
+        let (root, _) = music("groups");
+        let at = |d: &str| root.join(d).to_string_lossy().into_owned();
+        let lines = vec![
+            format!("folder|0||{}", root.to_string_lossy()),
+            "group|1|Play".to_string(),
+            format!("folder|1|Live|{}", at("Albums/Live")),
+            format!("folder|1||{}", at("Albums")),
+        ];
+        (root, FolderTree::from_lines(&lines))
+    }
+
+    #[test]
+    fn a_group_holds_folders_and_a_click_on_it_folds_them_in_and_out() {
+        let (root, mut t) = grouped();
+        assert_eq!(t.shown(), [0, 1, 2, 3], "all shown: the group is unfolded");
+        assert_eq!(t.items[2].label(), "Live", "a folder can have a name of its own");
+        assert_eq!(t.items[3].label(), "Albums", "else its own name");
+        let p = Parts::new(AT, false);
+        let on = |n: usize| (p.views.x + 5, p.views.y + n as i32 * p.row_h + 2);
+        let shown_before = t.folder().map(String::from);
+        let (x, y) = on(1);
+        t.press(AT, x, y, false, false, false);
+        assert_eq!(t.shown(), [0, 1], "the group is folded in: its folders are hidden");
+        assert_eq!(t.folder().map(String::from), shown_before, "the group is no folder: the right list stays");
+        t.press(AT, x, y, false, false, false);
+        assert_eq!(t.shown(), [0, 1, 2, 3], "and out again");
+        let (x, y) = on(2);
+        t.press(AT, x, y, false, false, false);
+        assert_eq!(names(&t), ["c"], "a folder in the group shows its files");
+        assert_eq!(t.lines()[1], "group|1|Play");
+        t.items[1] = Item::Group { name: "Play".into(), open: false };
+        assert_eq!(t.lines()[1], "group|0|Play", "whether it is folded is kept");
+        let back = FolderTree::from_lines(&t.lines());
+        assert_eq!(back.items, t.items);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn the_keys_skip_a_group_and_a_folded_group_hides_its_folders_from_them() {
+        let (root, mut t) = grouped();
+        t.focus = Some(List::Views);
+        t.pick_root(0);
+        t.key(AT, Key::Down, false);
+        assert_eq!(t.folder().map(label), Some("Live".to_string()), "down passes the group");
+        t.key(AT, Key::Up, false);
+        assert_eq!(t.folder().map(label), Some(label(&root.to_string_lossy())), "up passes it too");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn a_group_and_a_folder_in_it_have_their_own_icons() {
+        let (root, t) = grouped();
+        let mut b = popamp_skin::Bitmap::new(500, 300, 0);
+        let mut font = crate::font::Fonts::for_skin(&popamp_skin::Skin::builtin_vector(None)).list;
+        let c = PlColors { normal: 0xffffff, normal_bg: 0x000000, current: 0xffffff, selected_bg: 0x222222, font: String::new() };
+        t.draw(&mut Canvas::new(&mut b, crate::scale::Scale::ONE), &mut font, AT, &c, true, None);
+        let p = Parts::new(AT, false);
+        let at = |n: i32, dx: i32, dy: i32| b.get(p.views.x + 5 + dx, p.views.y + n * p.row_h + (p.row_h - 6) / 2 + dy);
+        let (ink, bg) = (Some(0xffffff), Some(0));
+        // Row 0 a folder (filled), row 1 the group (hollow), row 2 under it (an L).
+        assert_eq!((at(0, 4, 3), at(1, 4, 3), at(1, 0, 3), at(1, 7, 3)), (ink, bg, ink, ink), "a hollow folder for the group");
+        assert_eq!((at(2, 3, 0), at(2, 3, 3), at(2, 6, 3), at(2, 0, 0)), (ink, ink, ink, bg), "an L for the folder in it");
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
@@ -842,16 +1093,18 @@ y.ogg
         let p = Parts::new(AT, false);
         t.press(AT, p.views.x + 5, p.views.y + 2, false, false, false);
         assert_eq!(names(&t), ["Albums", "a", "Z"], "the first one again");
+        let back = FolderTree::from_lines(&t.lines());
+        assert_eq!(back.folders(), t.folders());
         let file = root.join("foldertree.txt");
-        t.save(&file).unwrap();
-        let back = FolderTree::load(&file);
-        assert_eq!(back.roots, t.roots);
+        std::fs::write(&file, t.folders().join("
+")).unwrap();
+        assert_eq!(FolderTree::load(&file).folders(), t.folders(), "the old file is still read");
         assert_eq!(names(&back), ["Albums", "a", "Z"], "the first is shown at start");
         t.remove_root();
-        assert_eq!(t.roots.len(), 1);
+        assert_eq!(t.folders().len(), 1);
         assert_eq!(names(&t), ["Live", "b"]);
         t.remove_root();
-        assert!(t.roots.is_empty() && t.entries.is_empty() && t.folder().is_none());
+        assert!(t.items.is_empty() && t.entries.is_empty() && t.folder().is_none());
         let _ = std::fs::remove_dir_all(root);
     }
 
@@ -897,15 +1150,15 @@ y.ogg
         assert_eq!(m.library.folder(), Some(root.to_string_lossy().as_ref()));
         assert_eq!(m.library.picked().len(), 2, "no tags read: the two files by name");
         assert_eq!(m.library.status(), "3 items");
-        let saved = std::fs::read_to_string(m.paths.foldertree_file()).unwrap();
-        assert_eq!(saved.trim(), root.to_string_lossy());
+        let saved = m.config.folder_tree().expect("kept in the ini file");
+        assert_eq!(saved, [format!("folder|0||{}", root.to_string_lossy())]);
         m.library_add_folder(&root.to_string_lossy());
-        assert_eq!(m.library.tree.roots.len(), 1, "not twice");
+        assert_eq!(m.library.tree.folders().len(), 1, "not twice");
         assert!(m.library.lib.folders.is_empty(), "the tag library is left alone");
         m.library_rescan();
         m.exec(Command::LibraryRemoveFolder);
-        assert!(m.library.tree.roots.is_empty());
-        assert_eq!(std::fs::read_to_string(m.paths.foldertree_file()).unwrap().trim(), "");
+        assert!(m.library.tree.items.is_empty());
+        assert_eq!(m.config.folder_tree(), Some(vec![]), "an empty tree is saved too");
         let menu = m.library_menu();
         assert!(menu.iter().any(|i| format!("{i:?}").contains("Add folder")));
         let _ = std::fs::remove_dir_all(root);

@@ -30,6 +30,7 @@ pub enum PanelKind {
     SkinBrowser,
     History,
     ReplayGainScan,
+    FolderEditor,
 }
 
 /// What a button or check box in a panel stands for.
@@ -39,6 +40,15 @@ pub enum Act {
     /// Preferences: what OK does, with the window kept open.
     Apply,
     Close,
+    /// The Folder and Group Editor: add a folder or a group, take away,
+    /// move a row up or down, in or out of its group.
+    FolderAdd,
+    GroupAdd,
+    FolderRemove,
+    FolderUp,
+    FolderDown,
+    FolderIn,
+    FolderOut,
     /// Picks a picture for the cover in File info.
     ChangeCover,
     RemoveCover,
@@ -81,6 +91,7 @@ pub enum Panel {
     Skins(SkinBrowser),
     History(crate::history::HistoryPanel),
     Scan(crate::scan::ScanPanel),
+    Folders(crate::folderedit::FolderEditor),
 }
 
 impl Panel {
@@ -102,6 +113,7 @@ impl Panel {
             PanelKind::SkinBrowser => Panel::Skins(SkinBrowser::new(model)),
             PanelKind::History => Panel::History(crate::history::HistoryPanel::new(model)),
             PanelKind::ReplayGainScan => Panel::Scan(crate::scan::ScanPanel::new(model)),
+            PanelKind::FolderEditor => Panel::Folders(crate::folderedit::FolderEditor::new(model)),
         }
     }
 
@@ -118,6 +130,7 @@ impl Panel {
             Panel::Skins(_) => PanelKind::SkinBrowser,
             Panel::History(_) => PanelKind::History,
             Panel::Scan(_) => PanelKind::ReplayGainScan,
+            Panel::Folders(_) => PanelKind::FolderEditor,
         }
     }
 
@@ -134,6 +147,7 @@ impl Panel {
             Panel::Skins(_) => "Skin browser",
             Panel::History(_) => "History",
             Panel::Scan(_) => "ReplayGain scan",
+            Panel::Folders(_) => "Folders and groups",
         }
     }
 
@@ -150,6 +164,7 @@ impl Panel {
             Panel::Skins(p) => &p.form,
             Panel::History(p) => &p.form,
             Panel::Scan(p) => &p.form,
+            Panel::Folders(p) => &p.form,
         }
     }
 
@@ -166,6 +181,7 @@ impl Panel {
             Panel::Skins(p) => &mut p.form,
             Panel::History(p) => &mut p.form,
             Panel::Scan(p) => &mut p.form,
+            Panel::Folders(p) => &mut p.form,
         }
     }
 
@@ -184,6 +200,28 @@ impl Panel {
             Panel::Skins(p) => p.handle(ev, model),
             Panel::History(p) => p.handle(ev, model),
             Panel::Scan(p) => p.handle(ev, model),
+            Panel::Folders(p) => p.handle(ev, model),
+        }
+    }
+
+    /// The mouse went down at `(x, y)` of the form.
+    pub fn mouse_press(&mut self, x: i32, y: i32) {
+        if let Panel::Folders(p) = self {
+            p.mouse_press(x, y);
+        }
+    }
+
+    /// The mouse moved to `(x, y)`; whether the panel needs drawing again.
+    pub fn mouse_drag(&mut self, x: i32, y: i32) -> bool {
+        match self {
+            Panel::Folders(p) => p.mouse_drag(x, y),
+            _ => false,
+        }
+    }
+
+    pub fn mouse_release(&mut self) {
+        if let Panel::Folders(p) = self {
+            p.mouse_release();
         }
     }
 

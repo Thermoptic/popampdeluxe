@@ -1165,10 +1165,25 @@ impl Model {
         }
     }
 
-    fn save_tree(&self) {
-        if let Err(e) = self.library.tree.save(&self.paths.foldertree_file()) {
+    /// Writes the folder tree into the settings; `save_tree` writes the file too.
+    pub fn sync_tree(&mut self) {
+        let lines = self.library.tree.lines();
+        self.config.set_folder_tree(&lines);
+    }
+
+    fn save_tree(&mut self) {
+        self.sync_tree();
+        if let Err(e) = self.config.save() {
             log::warn!("cannot save the folder tree: {e}");
         }
+    }
+
+    /// The Folder and Group Editor was closed with OK: `items` is the new tree.
+    pub fn library_set_tree(&mut self, items: Vec<crate::foldertree::Item>) {
+        self.library.tree.set_items(items);
+        self.save_tree();
+        self.ui.push(UiReq::Layout);
+        self.pl_dirty += 1;
     }
 
     /// Chooses which library the window shows: the tags (false) or the folder tree.
@@ -1241,6 +1256,9 @@ impl Model {
             MenuItem::cmd("Add folder…", "", Command::LibraryAddFolder),
             MenuItem::cmd("Rescan folders", "", Command::LibraryRescan),
         ];
+        if self.library.tree_mode {
+            items.push(MenuItem::cmd("Folders and groups…", "", Command::LibraryEditFolders));
+        }
         if let Some(folder) = self.library.folder() {
             let what = if self.library.tree_mode { "from the list" } else { "from the library" };
             items.push(MenuItem::cmd(&format!("Remove “{}” {what}", folder_label(folder)), "", Command::LibraryRemoveFolder));

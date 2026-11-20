@@ -17,6 +17,7 @@ mod filetypes;
 #[cfg(target_os = "macos")]
 mod finder;
 mod font;
+mod folderedit;
 mod foldertree;
 mod gallery;
 mod headless;
