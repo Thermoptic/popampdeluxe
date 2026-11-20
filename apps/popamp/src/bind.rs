@@ -301,7 +301,7 @@ mod tests {
         m.settings_mut().ml_height = 300;
         assert_eq!(window_size(&m, WindowKey::Library), (500, 300));
         m.settings_mut().ml_ws = true;
-        assert_eq!(window_size(&m, WindowKey::Library), (500, 14), "shaded: the title bar only");
+        assert_eq!(window_size(&m, WindowKey::Library), (500, 20), "shaded: the title bar only");
         m.exec(Command::ToggleLibraryShade);
         assert_eq!(window_size(&m, WindowKey::Library), (500, 300), "and back");
     }

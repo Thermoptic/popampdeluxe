@@ -576,9 +576,26 @@ fn library_window() -> WindowDef {
 }
 
 /// The library's windowshade strip, which a skin that draws the library
-/// window itself and gives it none gets. It says nothing: no title.
+/// window itself and gives it none gets: the top of the library window as
+/// it is when open, the playlist's title bar without its title, so that it
+/// has the colours of the other windows (the strip of the playlist's own
+/// shade is another picture, and some skins draw it in other colours). It
+/// says nothing: no title. Preferences takes it for its title bar too.
 pub(crate) fn library_shade() -> Mode {
-    shade_bar(Command::ToggleLibraryShade, Command::ToggleLibraryWindow, None)
+    let close = Command::ToggleLibraryWindow;
+    let shade = Command::ToggleLibraryShade;
+    let v = vec![
+        piece(Start(0), Start(0), pair_look(p::TOP_LEFT), 25, 20),
+        Element::new(
+            span(Start(25), Start(0), End(-25), Start(20)),
+            Kind::Image { look: pair_look(p::TOP_TILE), fill: Fill::Tile, lit: None },
+        ),
+        piece(End(-25), Start(0), pair_look(p::TOP_RIGHT), 25, 20),
+        Element::new(span(Start(0), Start(0), End(0), Start(20)), Kind::Drag { double: Some(shade) }).cursor(C::PTBar),
+        button(span(End(-11), Start(3), End(-2), Start(12)), pl_overlay(p::CLOSE_PRESSED), Action::click(close)).cursor(C::PClose),
+        button(span(End(-20), Start(3), End(-11), Start(12)), pl_overlay(p::SHADE_PRESSED), Action::click(shade)).cursor(C::PWinBut),
+    ];
+    Mode { width: Dim::Free { min: p::MIN_SIZE.0, step: p::STEP.0 }, height: Dim::Fixed(20), cursor: C::PWSNorm, elements: v, shape: None }
 }
 
 /// The small transport buttons drawn in the playlist frame's bottom right.

@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- The Media Library's windowshade strip, and the title bar of Preferences, are the
+  top of the playlist window (with its lines in the colours of the skin) instead of
+  the playlist's shade strip, which some skins draw in other colours. They are
+  20 pixels high.
 - In Preferences the white caret of a box shows only when you click the box,
   not all the time. In a box that holds a number, the up and down keys, and
   the mouse wheel over it, raise and lower the number (up: more).
