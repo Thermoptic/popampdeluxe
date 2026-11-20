@@ -1,0 +1,32 @@
+; ABOUT
+; =====
+; This is an edit of "Winamp_Classic_[CM].wsz"
+; I replaced most of the green with amber, inspired by oldskool amber terminals.
+; It looks like the [CM] edit was created around 2011/02/04 based on the last modified dates.
+; VISCOLOR.TXT originally dated back to 1998/09/24.
+;
+; This amber edit was released on 2021/09/13.
+;
+; Enjoy!
+;
+; Original notes from PLEDIT.TXT:
+;
+; The original author is Adam Kennedy <adamk@iname.com>
+;
+; Hope you don't mind Adam :)
+;
+;
+; -Justin
+;
+
+//USE THIS FILE ONLY TO REFERENCE THE PLEDIT COLORS
+//
+//
+[Text]
+Normal=#00FF00 //Color of the regular text (Playlist). 
+Current=#FFFFFF //Color of the current track text (Playlist). 
+NormalBG=#000000 //Background for normal text (Playlist). 
+SelectedBG=#0000FF //Background for the selected text (Playlist) 
+MbFG=#00FF00 //Text color in thestatus bar. (video / MiniBrowser) 
+MbBG=#000000 //Text background in the status bar. (video / MiniBrowser) 
+Font=Arial //Font face that's used in both windows 
