@@ -107,6 +107,8 @@ pub struct Status {
 pub struct Model {
     pub paths: Paths,
     pub config: Config,
+    /// The keys of the keyboard shortcuts.
+    pub keymap: crate::keymap::Keymap,
     pub playlist: Playlist,
     pub engine: Engine,
     pub format: Arc<Format>,
@@ -268,7 +270,9 @@ impl Model {
         library.tree_mode = config.settings.ml_foldertree;
         library.tree.hide_ext = config.settings.ml_hide_ext;
         let skin = Skin::builtin_vector(Some(&config.settings.skin_colors));
+        let keymap = crate::keymap::Keymap::load(|id| config.hotkey(id));
         let mut m = Model {
+            keymap,
             library,
             paths,
             config,
@@ -522,6 +526,41 @@ impl Model {
                 self.playlist.cursor = pos;
             }
             self.pl_dirty += 1;
+        }
+    }
+
+    /// Gives keyboard shortcut `i` (a place in `keymap::BINDINGS`) the keys
+    /// `chord`, in place of its own or (`add`) besides them, and keeps it in
+    /// the ini file. Returns the shortcut that lost the keys, if one did.
+    pub fn set_hotkey(&mut self, i: usize, chord: crate::keymap::Chord, add: bool) -> Option<usize> {
+        let lost = self.keymap.assign(i, chord, add);
+        self.keep_hotkeys(i);
+        if let Some(j) = lost {
+            self.keep_hotkeys(j);
+        }
+        lost
+    }
+
+    /// Takes the keys off shortcut `i` (`reset`: gives it its own again).
+    pub fn change_hotkey(&mut self, i: usize, reset: bool) {
+        if reset {
+            self.keymap.reset(i);
+        } else {
+            self.keymap.clear(i);
+        }
+        self.keep_hotkeys(i);
+    }
+
+    /// Writes what shortcut `i` has into the settings and the file.
+    fn keep_hotkeys(&mut self, i: usize) {
+        let id = crate::keymap::BINDINGS[i].id;
+        if self.keymap.is_default(i) {
+            self.config.clear_hotkey(id);
+        } else {
+            self.config.set_hotkey(id, &self.keymap.saved(i));
+        }
+        if let Err(e) = self.config.save() {
+            log::warn!("cannot save the hotkeys: {e}");
         }
     }
 

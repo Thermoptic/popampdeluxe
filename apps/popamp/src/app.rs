@@ -5,6 +5,7 @@ use crate::bar::{self, Screen};
 use crate::canvas::Canvas;
 use crate::dialogs::{self, DialogResult};
 use crate::font::Fonts;
+use crate::keymap::Scope;
 use crate::menu::{self, Layout, MenuItem};
 use crate::model::{AddMode, AppEvent, Model, UiReq};
 use crate::panels::{Panel, PanelKind};
@@ -730,10 +731,11 @@ impl App {
     }
 
     /// Opens a menu at `at`; a submenu there with `sub`.
-    fn open_popup(&mut self, el: &ActiveEventLoop, items: Vec<MenuItem>, at: (i32, i32), sub: bool) {
+    fn open_popup(&mut self, el: &ActiveEventLoop, mut items: Vec<MenuItem>, at: (i32, i32), sub: bool) {
         if items.is_empty() {
             return;
         }
+        self.model.keymap.relabel(&mut items);
         // Drawn at the density of the screen it opens on, placed within it.
         let screens = self.screens();
         let pct = if platform::DESKTOP_IN_POINTS { pct_on(&screens, at, self.dialog_pct()) } else { self.dialog_pct() };
@@ -926,6 +928,16 @@ impl App {
     fn panel_event(&mut self, el: &ActiveEventLoop, i: usize, ev: WindowEvent) {
         let p = &mut self.panels[i];
         let (x, y) = p.cursor;
+        // A shortcut waiting for its keys takes the key as it is.
+        if let WindowEvent::KeyboardInput { event, .. } = &ev {
+            if let (ElementState::Pressed, PhysicalKey::Code(code)) = (event.state, event.physical_key) {
+                let mods = (self.mods.control_key(), self.mods.shift_key(), self.mods.alt_key());
+                if p.panel.raw_key(code, mods, &mut self.model) {
+                    self.panel_changed(i);
+                    return;
+                }
+            }
+        }
         let form = p.panel.form_mut();
         let out = match ev {
             WindowEvent::CloseRequested => Event::Cancel,
@@ -1666,7 +1678,6 @@ impl App {
             return;
         }
         let (ctrl, shift, alt) = (self.mods.control_key(), self.mods.shift_key(), self.mods.alt_key());
-        use Command as C;
         use KeyCode as K;
         // Window-specific keys first.
         if k == WindowKey::Eq && !ctrl && !alt {
@@ -1694,8 +1705,6 @@ impl App {
                     self.model.set_preamp(v);
                     return self.redraw_after(el, k);
                 }
-                K::KeyN => return self.run(el, C::ToggleEq),
-                K::KeyA => return self.run(el, C::ToggleEqAutoload),
                 K::KeyS => {
                     let items = self.model.eq_presets_menu();
                     let at = self.cursor_screen(k);
@@ -1704,9 +1713,6 @@ impl App {
                 }
                 _ => {}
             }
-        }
-        if k == WindowKey::Eq && ctrl && alt && code == K::KeyS {
-            return self.run(el, C::EqPresetLoad);
         }
         if k == WindowKey::Playlist {
             let nav = match code {
@@ -1721,36 +1727,6 @@ impl App {
             if let Some(n) = nav {
                 self.skins[WindowKey::Playlist.index()].key_nav(&mut self.model, n, shift);
                 return self.redraw_after(el, k);
-            }
-            let cmd = match code {
-                K::ArrowUp if alt => Some(C::MoveSelectionUp),
-                K::ArrowDown if alt => Some(C::MoveSelectionDown),
-                K::Enter | K::NumpadEnter => Some(C::PlaySelected),
-                K::Delete if ctrl && shift => Some(C::ClearPlaylist),
-                K::Delete if ctrl => Some(C::PlCropSelected),
-                K::Delete if alt => Some(C::RemoveMissing),
-                K::Delete => Some(C::PlRemoveSelected),
-                K::KeyA if ctrl && alt => Some(C::ToggleAlwaysOnTop),
-                K::KeyA if ctrl => Some(C::SelectAll),
-                K::KeyI if ctrl => Some(C::InvertSelection),
-                K::KeyN if ctrl => Some(C::ClearPlaylist),
-                K::KeyO if ctrl => Some(C::PlaylistOpen),
-                K::KeyS if ctrl => Some(C::PlaylistSave),
-                K::KeyE if ctrl => Some(C::EditPlaylistEntry),
-                K::KeyW if ctrl => Some(C::TogglePlShade),
-                K::KeyR if ctrl && shift => Some(C::RandomizeList),
-                K::KeyR if ctrl => Some(C::ReverseList),
-                K::Digit1 if ctrl && shift => Some(C::SortByTitle),
-                K::Digit2 if ctrl && shift => Some(C::SortByFileName),
-                K::Digit3 if ctrl && shift => Some(C::SortByPath),
-                K::KeyL if ctrl => Some(C::PlAddUrl),
-                K::KeyL if shift => Some(C::PlAddFolder),
-                K::KeyL if !alt => Some(C::PlAddFiles),
-                K::Insert => Some(C::PlAddFolder),
-                _ => None,
-            };
-            if let Some(c) = cmd {
-                return self.run(el, c);
             }
         }
         if k == WindowKey::Library && !alt {
@@ -1767,71 +1743,27 @@ impl App {
                 return self.redraw_all();
             }
         }
-        if k == WindowKey::Eq && ctrl && code == K::KeyW {
-            return self.run(el, C::ToggleEqShade);
+        // The keys of the shortcuts: the window's own first, then the player's.
+        let scope = match k {
+            WindowKey::Eq => Some(Scope::Equalizer),
+            WindowKey::Playlist => Some(Scope::Playlist),
+            _ => None,
+        };
+        let cmd = scope
+            .and_then(|s| self.model.keymap.find(s, code, ctrl, shift, alt))
+            .or_else(|| self.model.keymap.find(Scope::Global, code, ctrl, shift, alt));
+        if let Some(c) = cmd {
+            return self.run(el, c);
         }
-        let cmd = match code {
-            K::F1 if ctrl => Some(C::About),
-            K::F1 => Some(C::About),
-            K::KeyA if ctrl => Some(C::ToggleAlwaysOnTop),
-            K::KeyW if ctrl => Some(C::ToggleWindowshade),
-            K::KeyD if ctrl => Some(C::ToggleDoubleSize),
-            K::KeyE if ctrl => Some(C::ToggleEasyMove),
-            K::KeyT if ctrl => Some(C::ToggleTimeMode),
-            K::KeyJ if ctrl => Some(C::JumpToTime),
-            K::KeyH if ctrl => Some(C::History),
-            K::KeyP if ctrl => Some(C::Preferences),
-            K::KeyK if ctrl && shift => Some(C::ToggleVis),
-            K::KeyK if ctrl || alt => Some(C::SelectVisPlugin),
-            K::KeyZ if ctrl => Some(C::StartOfList),
-            K::KeyB if ctrl => Some(C::EndOfList),
-            K::KeyV if ctrl => Some(C::StopAfterCurrent),
-            K::KeyL if ctrl => Some(C::OpenUrl),
-            K::KeyW if alt => Some(C::ToggleMainWindow),
-            K::KeyE if alt => Some(C::TogglePlaylistWindow),
-            K::KeyG if alt => Some(C::ToggleEqWindow),
-            K::KeyL if alt => Some(C::ToggleLibraryWindow),
-            K::KeyS if alt => Some(C::SkinBrowser),
-            K::KeyM if alt => Some(C::Minimize),
-            K::Digit3 if alt => Some(C::FileInfo),
-            K::KeyA if alt => Some(C::AlbumArt),
-            K::KeyI if ctrl && alt => Some(C::RemoveBookmark),
-            K::KeyI if alt && k == WindowKey::Playlist => Some(C::BookmarkSelected),
-            K::KeyI if alt => Some(C::AddBookmark),
+        // Keys that are not commands.
+        match code {
             K::KeyF if alt => {
                 let items = self.model.main_menu();
                 let at = self.cursor_screen(k);
                 self.open_popup(el, items, at, false);
-                return;
             }
-            K::Tab if ctrl => {
-                self.cycle_focus(k);
-                return;
-            }
-            _ if ctrl || alt => None,
-            K::KeyZ | K::Numpad4 => Some(C::Previous),
-            K::KeyX | K::Numpad5 => Some(C::Play),
-            K::KeyC => Some(C::Pause),
-            K::KeyV if shift => Some(C::StopFadeout),
-            K::KeyV => Some(C::Stop),
-            K::KeyB | K::Numpad6 => Some(C::Next),
-            K::KeyR if shift => Some(C::ToggleManualAdvance),
-            K::KeyR => Some(C::ToggleRepeat),
-            K::KeyS => Some(C::ToggleShuffle),
-            K::KeyJ | K::NumpadDecimal => Some(C::JumpToFile),
-            K::KeyL if shift => Some(C::OpenFolder),
-            K::KeyL | K::Numpad0 => Some(C::OpenFile),
-            K::Insert => Some(C::OpenFolder),
-            K::ArrowLeft | K::Numpad7 => Some(C::Back5s),
-            K::ArrowRight | K::Numpad9 => Some(C::Fwd5s),
-            K::ArrowUp | K::Numpad8 => Some(C::VolumeUp),
-            K::ArrowDown | K::Numpad2 => Some(C::VolumeDown),
-            K::Numpad1 => Some(C::TenTracksBack),
-            K::Numpad3 => Some(C::TenTracksForward),
-            _ => None,
-        };
-        if let Some(c) = cmd {
-            self.run(el, c);
+            K::Tab if ctrl => self.cycle_focus(k),
+            _ => {}
         }
     }
 

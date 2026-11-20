@@ -21,6 +21,40 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-20   HOTKEYS: CHANGE THE KEYBOARD SHORTCUTS
+  ..........................................................................
+
+  Preferences > Hotkeys
+
+  The list shows every keyboard shortcut of the player: playback, files,
+  windows, and the ones of the Playlist and Equalizer windows. To change one:
+
+     1. Pick it in the list.
+     2. Press "Change", then press the new keys (a key, with Ctrl, Shift
+        and Alt held if you want). Esc cancels.
+
+  The other buttons: "Add" gives the shortcut one more key besides its own,
+  "Clear" takes all its keys away, "Default" gives it the keys it came with,
+  and "All default" does that for every shortcut. Double-click a row to
+  change it too.
+
+  If the keys you press already run something else in the same window, the
+  other shortcut loses them, and the line under the list says so. The menus
+  show the keys you have set.
+
+  Changes apply at once and are kept in popamp.ini, in a section of their own:
+
+     [Hotkeys]
+     pause=Ctrl+Y;X
+
+  A line is there only for a shortcut that is not as it came. Several keys
+  are written with ";" between them, and an empty line means no keys.
+
+  The system-wide hotkeys (Ctrl+Alt with Insert, Home, End, Page Up/Down and
+  the arrows, from "Global hotkeys" in Preferences > Desktop) are not in the
+  list: they stay as they are.
+
+
   2026-11-20   NUMBER BOXES IN PREFERENCES
   ..........................................................................
 

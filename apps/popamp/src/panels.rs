@@ -49,6 +49,12 @@ pub enum Act {
     FolderDown,
     FolderIn,
     FolderOut,
+    /// Preferences > Hotkeys: give the picked shortcut other keys, more keys, none, or its own again.
+    HotkeyChange,
+    HotkeyAdd,
+    HotkeyClear,
+    HotkeyDefault,
+    HotkeysAllDefault,
     /// Picks a picture for the cover in File info.
     ChangeCover,
     RemoveCover,
@@ -104,6 +110,7 @@ impl Panel {
                 popamp_audio::output::devices(),
                 FileTypes::from_env(),
                 crate::font::installed(&model.paths.fonts_dirs()),
+                &model.keymap,
             )),
             #[cfg(feature = "plugins")]
             PanelKind::Plugins => Panel::Plugins(crate::plugins::PluginsPanel::new(model)),
@@ -201,6 +208,15 @@ impl Panel {
             Panel::History(p) => p.handle(ev, model),
             Panel::Scan(p) => p.handle(ev, model),
             Panel::Folders(p) => p.handle(ev, model),
+        }
+    }
+
+    /// A key pressed with these modifiers (ctrl, shift, alt), before the form
+    /// reads it: whether the panel used it (a shortcut waits for its keys).
+    pub fn raw_key(&mut self, code: winit::keyboard::KeyCode, mods: (bool, bool, bool), model: &mut Model) -> bool {
+        match self {
+            Panel::Prefs(p) => p.raw_key(code, mods, model),
+            _ => false,
         }
     }
 
@@ -601,10 +617,11 @@ enum Section {
     Desktop,
     Internet,
     Shortcuts,
+    Hotkeys,
 }
 
 impl Section {
-    const ALL: [Section; 9] = [
+    const ALL: [Section; 10] = [
         Section::Windows,
         Section::Font,
         Section::Interface,
@@ -614,6 +631,7 @@ impl Section {
         Section::Desktop,
         Section::Internet,
         Section::Shortcuts,
+        Section::Hotkeys,
     ];
 
     fn label(self) -> &'static str {
@@ -627,6 +645,7 @@ impl Section {
             Section::Desktop => "Desktop",
             Section::Internet => "Internet",
             Section::Shortcuts => "Shortcuts",
+            Section::Hotkeys => "Hotkeys",
         }
     }
 
@@ -642,7 +661,7 @@ impl Section {
             Section::Library => &[Flag::EnqueueDefault, Flag::HideExt],
             Section::Desktop => &[Flag::TrayIcon, Flag::MinimizeToTray, Flag::NotifyTracks, Flag::GlobalHotkeys],
             Section::Internet => &[Flag::CheckUpdates],
-            Section::Shortcuts => &[],
+            Section::Shortcuts | Section::Hotkeys => &[],
         }
     }
 
@@ -652,7 +671,7 @@ impl Section {
             Section::Playlist => &[Field::FontSize, Field::TitleFormat],
             Section::Playback => &[Field::FadeMs, Field::CrossfadeMs, Field::BufferMs, Field::SoundFont],
             Section::Internet => &[Field::Proxy],
-            Section::Windows | Section::Font | Section::Library | Section::Desktop | Section::Shortcuts => &[],
+            Section::Windows | Section::Font | Section::Library | Section::Desktop | Section::Shortcuts | Section::Hotkeys => &[],
         }
     }
 }
@@ -677,6 +696,31 @@ pub struct Preferences {
     font_choice: usize,
     /// The check boxes of the media library types: the tags, the folder tree.
     library_type: [usize; 2],
+    /// Hotkeys: the list of shortcuts, one row to each in `keymap::BINDINGS`,
+    /// and the line that says what is going on.
+    hotkey_list: usize,
+    hotkey_status: usize,
+    /// The shortcut waiting for keys to be pressed, and whether they are
+    /// added to its own.
+    capturing: Option<(usize, bool)>,
+}
+
+/// The rows of the list of shortcuts: what each does and its keys.
+pub fn hotkey_rows(keymap: &crate::keymap::Keymap) -> Vec<String> {
+    use crate::keymap::{Scope, BINDINGS};
+    BINDINGS
+        .iter()
+        .enumerate()
+        .map(|(i, b)| {
+            let window = match b.scope {
+                Scope::Global => "",
+                Scope::Playlist => "Playlist: ",
+                Scope::Equalizer => "Equalizer: ",
+            };
+            let keys = keymap.text(i);
+            format!("{window}{}   [{}]", b.label, if keys.is_empty() { "none" } else { &keys })
+        })
+        .collect()
 }
 
 /// Shortcut rows on the Shortcuts page.
@@ -686,7 +730,13 @@ const SHORTCUT_ROWS: usize = 6;
 const DEVICE_ROWS: i32 = 4;
 
 impl Preferences {
-    fn new(s: &Settings, mut devices: Vec<Device>, file_types: FileTypes, font_files: Vec<std::path::PathBuf>) -> Preferences {
+    fn new(
+        s: &Settings,
+        mut devices: Vec<Device>,
+        file_types: FileTypes,
+        font_files: Vec<std::path::PathBuf>,
+        keymap: &crate::keymap::Keymap,
+    ) -> Preferences {
         let w = 560;
         let mut form = Form::new(w, 0);
         let labels = Section::ALL.map(|p| p.label().to_string()).to_vec();
@@ -700,12 +750,14 @@ impl Preferences {
         let mut fonts: Vec<String> = Vec::new();
         let mut font_choice = 0;
         let mut library_type = [0; 2];
+        let (mut hotkey_list, mut hotkey_status) = (0, 0);
         for (page, section) in Section::ALL.into_iter().enumerate() {
             let flags = section.flags();
             let rows = flags.len() as i32;
             // The shortcut rows sit inside the frame.
             let inside = match section {
                 Section::Shortcuts => 16 + SHORTCUT_ROWS as i32 * 30,
+                Section::Hotkeys => 272,
                 Section::Font => 62,
                 Section::Interface => 28,
                 _ => 0,
@@ -813,6 +865,28 @@ impl Preferences {
                     // Room for the options of the last row to open.
                     y += SHORTCUT_ROWS as i32 * 30 + 130;
                 }
+                Section::Hotkeys => {
+                    let list = Widget::List { rows: vec![], selected: None, scroll: 0 };
+                    hotkey_list = form.add_on(page, Rect::new(x0 + 12, 30, cw - 24, 4 + 11 * ROW_H), list);
+                    form.set_rows(hotkey_list, hotkey_rows(keymap), Some(0));
+                    for (n, (label, act)) in [
+                        ("Change", Act::HotkeyChange),
+                        ("Add", Act::HotkeyAdd),
+                        ("Clear", Act::HotkeyClear),
+                        ("Default", Act::HotkeyDefault),
+                    ]
+                    .into_iter()
+                    .enumerate()
+                    {
+                        let r = Rect::new(x0 + 12 + n as i32 * 86, 240, BUTTON.0, BUTTON.1);
+                        form.add_on(page, r, Widget::Button { label: label.into(), action: act, default: false });
+                    }
+                    let r = Rect::new(x0 + 12, 270, BUTTON.0, BUTTON.1);
+                    form.add_on(page, r, Widget::Button { label: "All default".into(), action: Act::HotkeysAllDefault, default: false });
+                    let note = "Pick a shortcut, then Change.";
+                    hotkey_status = form.add_on(page, Rect::new(x0 + 12 + 90, 270, cw - 24 - 90, 24), Widget::Label { text: note.into(), dim: true });
+                    y = 310;
+                }
                 Section::Desktop => {
                     form.add_on(page, Rect::new(x0, y, cw, 22 + 3 * 22), Widget::Group { label: "Open with Popamp".into() });
                     #[cfg(linux_like)]
@@ -871,11 +945,84 @@ impl Preferences {
             fonts,
             font_choice,
             library_type,
+            hotkey_list,
+            hotkey_status,
+            capturing: None,
         }
     }
 
+    /// Makes the picked shortcut wait for the keys to give it.
+    fn start_capture(&mut self, add: bool) {
+        let Some(i) = self.form.selected(self.hotkey_list) else { return };
+        self.capturing = Some((i, add));
+        let what = crate::keymap::BINDINGS[i].label;
+        let text = format!("Press the keys for {what} (Esc: cancel)");
+        self.form.set_label(self.hotkey_status, text);
+    }
+
+    /// Writes the list of shortcuts again, with `pick` picked.
+    fn show_hotkeys(&mut self, model: &Model, pick: usize, note: &str) {
+        self.form.set_rows(self.hotkey_list, hotkey_rows(&model.keymap), Some(pick));
+        self.form.set_label(self.hotkey_status, note.into());
+    }
+
+    /// A key was pressed while a shortcut waits for its keys. Whether the
+    /// window used it.
+    pub fn raw_key(&mut self, code: winit::keyboard::KeyCode, (ctrl, shift, alt): (bool, bool, bool), model: &mut Model) -> bool {
+        let Some((i, add)) = self.capturing else { return false };
+        if code == winit::keyboard::KeyCode::Escape {
+            self.capturing = None;
+            self.show_hotkeys(model, i, "Not changed.");
+            return true;
+        }
+        // A modifier alone, or a key that cannot be a shortcut: go on waiting.
+        let Some(chord) = crate::keymap::Chord::new(code, ctrl, shift, alt) else { return true };
+        self.capturing = None;
+        let lost = model.set_hotkey(i, chord, add);
+        let (what, keys) = (crate::keymap::BINDINGS[i].label, chord.text());
+        let note = match lost {
+            Some(j) => format!("{keys} now runs {what}; it was {}.", crate::keymap::BINDINGS[j].label),
+            None => format!("{keys} now runs {what}."),
+        };
+        self.show_hotkeys(model, i, &note);
+        true
+    }
+
     fn handle(&mut self, ev: Event<Act>, model: &mut Model) -> bool {
+        if self.capturing.is_some() && !matches!(ev, Event::Edited | Event::None) {
+            // Anything but a key ends the waiting.
+            self.capturing = None;
+            self.form.set_label(self.hotkey_status, "Pick a shortcut, then Change.".into());
+        }
         match ev {
+            Event::Clicked(Act::HotkeyChange) => {
+                self.start_capture(false);
+                true
+            }
+            Event::Clicked(Act::HotkeyAdd) => {
+                self.start_capture(true);
+                true
+            }
+            Event::Activated if self.form.is_shown(self.hotkey_list) => {
+                self.start_capture(false);
+                true
+            }
+            Event::Clicked(Act::HotkeyClear | Act::HotkeyDefault) => {
+                if let Some(i) = self.form.selected(self.hotkey_list) {
+                    let reset = ev == Event::Clicked(Act::HotkeyDefault);
+                    model.change_hotkey(i, reset);
+                    self.show_hotkeys(model, i, if reset { "Back to its own keys." } else { "No keys now." });
+                }
+                true
+            }
+            Event::Clicked(Act::HotkeysAllDefault) => {
+                for i in 0..crate::keymap::BINDINGS.len() {
+                    model.change_hotkey(i, true);
+                }
+                let pick = self.form.selected(self.hotkey_list).unwrap_or(0);
+                self.show_hotkeys(model, pick, "All shortcuts have their own keys again.");
+                true
+            }
             Event::Toggled(Act::Flag(f), on) => {
                 f.set(model, on);
                 true
@@ -1435,7 +1582,7 @@ pub(crate) mod tests {
     fn the_interface_page_chooses_a_custom_font_and_its_size() {
         let mut m = songs(&[]);
         let files = vec![std::path::PathBuf::from("/fonts/Alpha.ttf"), "/fonts/Beta.otf".into()];
-        let mut p = Panel::Prefs(Preferences::new(m.settings(), vec![], test_types("font"), files.clone()));
+        let mut p = Panel::Prefs(Preferences::new(m.settings(), vec![], test_types("font"), files.clone(), &m.keymap));
         assert!(!m.settings().custom_font && m.settings().font_file.is_empty());
         let r = check_box(&mut p, &mut m, Flag::CustomFont);
         click(&mut p, &mut m, r);
@@ -1452,7 +1599,7 @@ pub(crate) mod tests {
         assert!(m.ui.iter().any(|r| matches!(r, UiReq::SkinChanged)));
 
         // Shown again, and a font that left the folder is kept.
-        let p = Panel::Prefs(Preferences::new(m.settings(), vec![], test_types("font2"), files[..1].to_vec()));
+        let p = Panel::Prefs(Preferences::new(m.settings(), vec![], test_types("font2"), files[..1].to_vec(), &m.keymap));
         let Panel::Prefs(pr) = &p else { unreachable!() };
         assert_eq!(pr.fonts, ["Alpha.ttf", "Beta.otf (not found)"]);
         assert_eq!(pr.form.choice(pr.font_choice), 1);
@@ -1509,7 +1656,7 @@ pub(crate) mod tests {
             let Panel::Prefs(pr) = p else { unreachable!() };
             pr.shortcut_rows.clone()
         };
-        assert!(Section::ALL.last() == Some(&Section::Shortcuts), "after Internet");
+        assert!(Section::ALL.last() == Some(&Section::Hotkeys), "after Shortcuts");
         assert_eq!(m.settings().title_shortcuts, "");
         // Equalizer window, middle mouse, pause; then main window, right, next.
         let [w, c, a] = rows(&p)[0];
@@ -1669,6 +1816,69 @@ pub(crate) mod tests {
         assert_eq!(m.settings().row_gap, 1);
     }
 
+    /// Presses and lets go of the button of `act`.
+    fn push(p: &mut Panel, m: &mut Model, act: Act) {
+        let r = button_rect(p, act);
+        let down = p.form_mut().mouse_down(r.x + 2, r.y + 2, false);
+        p.handle(down, m);
+        let up = p.form_mut().mouse_up(r.x + 2, r.y + 2);
+        p.handle(up, m);
+    }
+
+    fn button_rect(p: &Panel, act: Act) -> Rect {
+        let form = p.form();
+        let i = (0..form.count_all()).find(|&i| matches!(form.widget(i), Widget::Button { action, .. } if *action == act)).unwrap();
+        form.rect(i)
+    }
+
+    #[test]
+    fn the_hotkeys_page_lists_every_shortcut_and_changes_the_keys_of_the_one_picked() {
+        use crate::keymap::{Chord, BINDINGS};
+        use winit::keyboard::KeyCode as K;
+        let mut m = songs(&["Alpha"]);
+        let mut p = Panel::open(PanelKind::Preferences, &m);
+        let Panel::Prefs(pr) = &p else { unreachable!() };
+        let list = pr.hotkey_list;
+        let Widget::List { rows, .. } = pr.form.widget(list) else { panic!() };
+        assert_eq!(rows.len(), BINDINGS.len(), "a row for each shortcut");
+        assert!(rows[1].starts_with("Play") && rows[1].contains("[X, Num5]"), "{}", rows[1]);
+        // Pick Pause (the third row), press Change, then a key.
+        let r = reach(&mut p, &mut m, list);
+        click(&mut p, &mut m, Rect::new(r.x + 1, r.y + 2 * ROW_H + 2, 1, 1));
+        push(&mut p, &mut m, Act::HotkeyChange);
+        assert!(p.raw_key(K::ControlLeft, (true, false, false), &mut m), "a modifier alone: still waiting");
+        assert!(p.raw_key(K::KeyY, (true, false, false), &mut m), "Ctrl+Y taken");
+        let pause = BINDINGS.iter().position(|b| b.id == "pause").unwrap();
+        assert_eq!(m.keymap.text(pause), "Ctrl+Y");
+        assert_eq!(m.config.hotkey("pause"), Some("Ctrl+Y"), "kept in the ini file");
+        assert!(!p.raw_key(K::KeyQ, (false, false, false), &mut m), "not waiting any more: the key is not used");
+        let Panel::Prefs(pr) = &p else { unreachable!() };
+        let Widget::List { rows, .. } = pr.form.widget(list) else { panic!() };
+        assert!(rows[pause].contains("[Ctrl+Y]"));
+        // Add another, taking one from another shortcut.
+        push(&mut p, &mut m, Act::HotkeyAdd);
+        assert!(p.raw_key(K::KeyX, (false, false, false), &mut m));
+        assert_eq!(m.keymap.text(pause), "Ctrl+Y, X");
+        let play = BINDINGS.iter().position(|b| b.id == "play").unwrap();
+        assert_eq!(m.keymap.text(play), "Num5", "Play lost X to Pause");
+        assert_eq!(m.keymap.find(crate::keymap::Scope::Global, K::KeyX, false, false, false), Some(Command::Pause));
+        // Esc leaves it as it is.
+        push(&mut p, &mut m, Act::HotkeyChange);
+        assert!(p.raw_key(K::Escape, (false, false, false), &mut m));
+        assert_eq!(m.keymap.text(pause), "Ctrl+Y, X");
+        // Clear, then Default.
+        push(&mut p, &mut m, Act::HotkeyClear);
+        assert_eq!(m.keymap.text(pause), "");
+        assert_eq!(m.config.hotkey("pause"), Some(""));
+        push(&mut p, &mut m, Act::HotkeyDefault);
+        assert_eq!(m.keymap.text(pause), "C");
+        assert_eq!(m.config.hotkey("pause"), None, "as it came: the ini file says nothing");
+        // All back.
+        push(&mut p, &mut m, Act::HotkeysAllDefault);
+        assert!(BINDINGS.iter().enumerate().all(|(i, _)| m.keymap.is_default(i)));
+        let _ = Chord::parse("A");
+    }
+
     #[test]
     fn cancel_forgets_typed_preferences() {
         let mut m = songs(&[]);
@@ -1686,7 +1896,7 @@ pub(crate) mod tests {
     fn prefs_with_devices(m: &Model) -> Panel {
         let cards =
             vec![device("default", "Default device"), device("hdmi:CARD=NVidia,DEV=0", "HDMI"), device("front:CARD=Audio,DEV=0", "USB")];
-        Panel::Prefs(Preferences::new(m.settings(), cards, test_types("devices"), vec![]))
+        Panel::Prefs(Preferences::new(m.settings(), cards, test_types("devices"), vec![], &m.keymap))
     }
 
     #[cfg(target_os = "macos")]

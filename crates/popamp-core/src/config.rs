@@ -597,6 +597,21 @@ impl Config {
         &self.path
     }
 
+    /// What the ini file says about a keyboard shortcut (`[Hotkeys]`): its
+    /// keys joined with `;`, empty for no keys; none when it is as it came.
+    pub fn hotkey(&self, id: &str) -> Option<&str> {
+        self.ini.get("Hotkeys", id)
+    }
+
+    pub fn set_hotkey(&mut self, id: &str, keys: &str) {
+        self.ini.set("Hotkeys", id, keys);
+    }
+
+    /// The shortcut is as it came again: the ini file says nothing of it.
+    pub fn clear_hotkey(&mut self, id: &str) {
+        self.ini.remove("Hotkeys", id);
+    }
+
     /// The folder tree of the Media Library as lines (`[FolderTree]`, keys
     /// `item1`, `item2`, ...), in order; none when it was never saved.
     pub fn folder_tree(&self) -> Option<Vec<String>> {

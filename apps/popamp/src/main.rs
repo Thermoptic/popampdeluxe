@@ -18,6 +18,7 @@ mod filetypes;
 mod finder;
 mod font;
 mod folderedit;
+mod keymap;
 mod foldertree;
 mod gallery;
 mod headless;

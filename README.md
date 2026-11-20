@@ -5,6 +5,8 @@
 *Updated 2026-11-19. The same list, as a text file that comes with every
 download: [popampdeluxe.txt](popampdeluxe.txt).*
 
+- **Hotkeys** (Preferences > Hotkeys). Every keyboard shortcut is listed and can
+  be changed, added to, cleared or reset. Kept in `popamp.ini`.
 - **Groups in the Foldertree.** Organise the folders of the left list in
   groups that fold in and out, and edit them in the Folder and Group Editor
   (LIST button > Folders and groups). Kept in `popamp.ini`.

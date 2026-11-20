@@ -217,6 +217,11 @@ impl<A: Copy + PartialEq> Form<A> {
         self.focus
     }
 
+    /// Whether control `i` is on the page shown.
+    pub fn is_shown(&self, i: usize) -> bool {
+        self.shown(i)
+    }
+
     /// Makes the keyboard go to no field until one is clicked.
     pub fn set_quiet(&mut self) {
         self.quiet = true;
