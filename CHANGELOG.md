@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Playlist files in the Foldertree**: `.m3u`, `.m3u8`, `.pls` and `.xspf` files
+  in the added folders are listed in the right list, with their extension.
+  A double click adds every song of the playlist file to the playlist.
 - **Copy to clipboard** (playlist menu): the right-click menu of the
   playlist window has *Copy to clipboard*, which puts every file in the
   playlist on the clipboard as files to copy. Ctrl+V in a folder of Windows

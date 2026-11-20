@@ -173,6 +173,9 @@ impl FolderTree {
                             name
                         } else if is_audio(&path) {
                             path.file_stem().map_or(name, |s| s.to_string_lossy().into_owned())
+                        } else if popamp_core::plformats::is_playlist(&name) {
+                            // A playlist keeps its extension, to tell it from a song.
+                            name
                         } else {
                             continue;
                         };
@@ -693,6 +696,27 @@ mod tests {
 
     fn row(p: &Parts, n: usize) -> (i32, i32) {
         (p.table.rows.x + 20, p.table.rows.y + n as i32 * p.row_h + 2)
+    }
+
+    #[test]
+    fn playlist_files_are_listed_with_their_extension_and_open_as_their_songs() {
+        let (root, _) = music("lists");
+        std::fs::write(root.join("mix.m3u"), "x.ogg
+y.ogg
+").unwrap();
+        std::fs::write(root.join("radio.pls"), "[playlist]
+").unwrap();
+        std::fs::write(root.join("notes.txt"), "").unwrap();
+        let mut t = FolderTree::default();
+        t.add_root(&root.to_string_lossy());
+        let names: Vec<_> = t.entries.iter().map(|e| e.name.clone()).collect();
+        assert!(names.contains(&"mix.m3u".to_string()) && names.contains(&"radio.pls".to_string()));
+        assert!(!names.iter().any(|n| n.contains("notes")));
+        // Opened, the playlist file goes to the same place a song does, and
+        // adding expands it into its songs.
+        let i = t.entries.iter().position(|e| e.name == "mix.m3u").unwrap();
+        assert_eq!(t.open(i).run, Some(Command::LibraryOpen));
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

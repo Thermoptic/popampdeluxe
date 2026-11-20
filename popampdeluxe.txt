@@ -21,6 +21,17 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-19   PLAYLIST FILES IN THE FOLDERTREE
+  ..........................................................................
+
+  Preferences > Media Library > Media Library Foldertree
+
+  Playlist files (.m3u, .m3u8, .pls, .xspf) in your folders now show in the
+  right list, next to the songs. They keep their extension, so you can tell
+  them from songs. Double-click one and every song in it is added to the
+  playlist window (or played, as set for double-click).
+
+
   2026-11-19   COPY THE PLAYLIST'S FILES TO THE CLIPBOARD
   ..........................................................................
 
