@@ -21,13 +21,27 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-20   HIDE FILE EXTENSION, AND AN ICON FOR PLAYLISTS
+  ..........................................................................
+
+  Preferences > Media Library > Hide file extension
+
+  Ticked (the default): the Foldertree writes every file name without its
+  extension: .mp3, .flac, .m3u, .pls and so on. Not ticked: every file shows
+  its extension. The change shows at once.
+
+  Playlist files (.m3u, .m3u8, .pls, .xspf) now have an icon of their own, a
+  small page with lines, in front of the name. Folders keep the folder icon
+  and songs the ball.
+
+
   2026-11-19   PLAYLIST FILES IN THE FOLDERTREE
   ..........................................................................
 
   Preferences > Media Library > Media Library Foldertree
 
   Playlist files (.m3u, .m3u8, .pls, .xspf) in your folders now show in the
-  right list, next to the songs. They keep their extension, so you can tell
+  right list, next to the songs. They show an icon of their own, so you can tell
   them from songs. Double-click one and every song in it is added to the
   playlist window (or played, as set for double-click).
 

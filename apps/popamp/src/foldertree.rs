@@ -43,6 +43,8 @@ pub enum SortBy {
 pub struct Entry {
     /// What the row says: the name of the folder, or of the file without its extension.
     pub name: String,
+    /// The file's whole name, with its extension.
+    pub file: String,
     pub path: String,
     pub dir: bool,
     /// The row `..`, which goes up to the folder above.
@@ -70,11 +72,18 @@ pub struct FolderTree {
     carry: Option<Carry>,
     /// The folder on screen could not be read.
     unreadable: bool,
+    /// Names are written without their extension.
+    pub hide_ext: bool,
 }
 
 /// Whether `path` is a file Popamp plays.
 fn is_audio(path: &Path) -> bool {
     path.extension().and_then(|e| e.to_str()).is_some_and(|e| popamp_core::audio_extensions().any(|x| x.eq_ignore_ascii_case(e)))
+}
+
+/// Whether the row is a playlist file.
+fn is_list(e: &Entry) -> bool {
+    !e.dir && popamp_core::plformats::is_playlist(&e.file)
 }
 
 /// The name of the last part of `path`.
@@ -169,18 +178,16 @@ impl FolderTree {
                             continue;
                         }
                         let path = e.path();
+                        let file = name.clone();
                         let name = if meta.is_dir() {
                             name
-                        } else if is_audio(&path) {
+                        } else if is_audio(&path) || popamp_core::plformats::is_playlist(&name) {
                             path.file_stem().map_or(name, |s| s.to_string_lossy().into_owned())
-                        } else if popamp_core::plformats::is_playlist(&name) {
-                            // A playlist keeps its extension, to tell it from a song.
-                            name
                         } else {
                             continue;
                         };
                         let path = path.to_string_lossy().into_owned();
-                        self.entries.push(Entry { name, path, dir: meta.is_dir(), up: false, modified: meta.modified().ok() });
+                        self.entries.push(Entry { name, file, path, dir: meta.is_dir(), up: false, modified: meta.modified().ok() });
                     }
                 }
                 Err(e) => {
@@ -192,7 +199,7 @@ impl FolderTree {
         self.order();
         let above = self.dir.as_deref().filter(|d| self.folder().map(Path::new) != Some(*d)).and_then(Path::parent);
         if let Some(parent) = above {
-            let up = Entry { name: "..".into(), path: parent.to_string_lossy().into_owned(), dir: true, up: true, modified: None };
+            let up = Entry { name: "..".into(), file: "..".into(), path: parent.to_string_lossy().into_owned(), dir: true, up: true, modified: None };
             self.entries.insert(0, up);
         }
         self.selected = vec![false; self.entries.len()];
@@ -448,13 +455,24 @@ impl FolderTree {
                             let fy = row.y + (row.h - 6) / 2;
                             pen.b.fill(fx, fy, 3, 1, color);
                             pen.b.fill(fx, fy + 1, 8, 5, color);
+                        } else if is_list(e) {
+                            // A playlist: a small page with lines on it.
+                            let py = row.y + (row.h - 7) / 2;
+                            let px = fx + 1;
+                            pen.b.fill(px, py, 5, 1, color);
+                            pen.b.fill(px, py + 1, 1, 5, color);
+                            pen.b.fill(px + 5, py + 1, 1, 5, color);
+                            pen.b.fill(px, py + 6, 6, 1, color);
+                            pen.b.set(px + 2, py + 2, color);
+                            pen.b.fill(px + 2, py + 4, 2, 1, color);
                         } else if !e.dir {
                             let by = row.y + (row.h - 5) / 2;
                             pen.b.fill(fx + 3, by, 3, 1, color);
                             pen.b.fill(fx + 2, by + 1, 5, 3, color);
                             pen.b.fill(fx + 3, by + 4, 3, 1, color);
                         }
-                        pen.left(rect(cell.x + icon, cell.y, (cell.w - icon).max(0), cell.h), &e.name, color);
+                        let shown = if self.hide_ext { &e.name } else { &e.file };
+                        pen.left(rect(cell.x + icon, cell.y, (cell.w - icon).max(0), cell.h), shown, color);
                     }
                     SortBy::Date => pen.right(cell, &e.modified.map(date_text).unwrap_or_default(), pen.dim),
                 }
@@ -699,7 +717,17 @@ mod tests {
     }
 
     #[test]
-    fn playlist_files_are_listed_with_their_extension_and_open_as_their_songs() {
+    fn hide_file_extension_is_a_preference_that_shows_or_hides_every_extension() {
+        let mut m = crate::model::Model::for_tests();
+        assert!(m.settings().ml_hide_ext && m.library.tree.hide_ext, "hidden by default");
+        crate::panels::Flag::HideExt.set(&mut m, false);
+        assert!(!m.settings().ml_hide_ext && !m.library.tree.hide_ext);
+        crate::panels::Flag::HideExt.set(&mut m, true);
+        assert!(m.library.tree.hide_ext);
+    }
+
+    #[test]
+    fn playlist_files_are_listed_with_their_own_icon_and_open_as_their_songs() {
         let (root, _) = music("lists");
         std::fs::write(root.join("mix.m3u"), "x.ogg
 y.ogg
@@ -709,12 +737,13 @@ y.ogg
         std::fs::write(root.join("notes.txt"), "").unwrap();
         let mut t = FolderTree::default();
         t.add_root(&root.to_string_lossy());
-        let names: Vec<_> = t.entries.iter().map(|e| e.name.clone()).collect();
+        let names: Vec<_> = t.entries.iter().map(|e| e.file.clone()).collect();
         assert!(names.contains(&"mix.m3u".to_string()) && names.contains(&"radio.pls".to_string()));
         assert!(!names.iter().any(|n| n.contains("notes")));
+        assert!(t.entries.iter().any(|e| e.name == "mix" && is_list(e)), "the name without its extension, and a playlist icon");
         // Opened, the playlist file goes to the same place a song does, and
         // adding expands it into its songs.
-        let i = t.entries.iter().position(|e| e.name == "mix.m3u").unwrap();
+        let i = t.entries.iter().position(|e| e.file == "mix.m3u").unwrap();
         assert_eq!(t.open(i).run, Some(Command::LibraryOpen));
         let _ = std::fs::remove_dir_all(root);
     }

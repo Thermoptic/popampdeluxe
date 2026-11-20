@@ -186,6 +186,8 @@ settings! {
     /// The media library shows the folder tree, which reads file names,
     /// not the tags (Preferences > Media Library > Media Library Type).
     ml_foldertree: bool = false,
+    /// The folder tree writes file names without their extension.
+    ml_hide_ext: bool = true,
     /// Look for new and changed files in the library's folders at start.
     ml_scan_at_start: bool = true,
     // Playback.

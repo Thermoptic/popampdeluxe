@@ -262,6 +262,7 @@ impl Model {
         let mut library = library;
         library.tree = crate::foldertree::FolderTree::load(&paths.foldertree_file());
         library.tree_mode = config.settings.ml_foldertree;
+        library.tree.hide_ext = config.settings.ml_hide_ext;
         let skin = Skin::builtin_vector(Some(&config.settings.skin_colors));
         let mut m = Model {
             library,

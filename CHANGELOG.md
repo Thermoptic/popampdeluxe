@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Hide file extension** (Preferences > Media Library): on by default; when ticked
+  the Foldertree writes names without `.mp3`, `.m3u` and so on, when not
+  ticked every file shows its extension. Playlist files have an icon of
+  their own, a small page, beside the folder and the song ball.
 - **Playlist files in the Foldertree**: `.m3u`, `.m3u8`, `.pls` and `.xspf` files
   in the added folders are listed in the right list, with their extension.
   A double click adds every song of the playlist file to the playlist.

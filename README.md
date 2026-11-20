@@ -5,6 +5,8 @@
 *Updated 2026-11-19. The same list, as a text file that comes with every
 download: [popampdeluxe.txt](popampdeluxe.txt).*
 
+- **Hide file extension** (Preferences > Media Library) and an icon of its own
+  for playlist files in the Foldertree.
 - **Playlist files in the Foldertree**. .m3u/.pls files show in the right list;
   double-click adds all their songs to the playlist.
 - **Copy to clipboard** (right-click in the playlist, Windows). Every song in

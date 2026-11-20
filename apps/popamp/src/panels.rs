@@ -348,6 +348,7 @@ pub enum Flag {
     KeepScanOpen,
     CheckUpdates,
     EnqueueDefault,
+    HideExt,
 }
 
 impl Flag {
@@ -373,6 +374,7 @@ impl Flag {
             Flag::GlobalHotkeys => "Global hotkeys (Ctrl+Alt)",
             Flag::KeepScanOpen => "Keep the ReplayGain scan window open",
             Flag::EnqueueDefault => "Enter and double-click enqueue instead of playing",
+            Flag::HideExt => "Hide file extension",
         }
     }
 
@@ -411,6 +413,7 @@ impl Flag {
             Flag::GlobalHotkeys => &mut s.global_hotkeys,
             Flag::KeepScanOpen => &mut s.rg_scan_keep_open,
             Flag::EnqueueDefault => &mut s.enqueuedef,
+            Flag::HideExt => &mut s.ml_hide_ext,
         }
     }
 
@@ -429,6 +432,9 @@ impl Flag {
         match self.command() {
             Some(c) => model.exec(c),
             None => *self.slot(model.settings_mut()) = on,
+        }
+        if self == Flag::HideExt {
+            model.library.tree.hide_ext = on;
         }
         if matches!(self, Flag::SkinCursors | Flag::CustomFont | Flag::SkinBmpFont) {
             model.ui.push(UiReq::SkinChanged);
@@ -573,7 +579,7 @@ impl Section {
             Section::Interface => &[Flag::SkinBmpFont, Flag::CustomFont],
             Section::Playlist => &[Flag::DimInactive, Flag::ShowNumbers, Flag::ZeroPad],
             Section::Playback => &[Flag::AutoAdvance, Flag::KeepScanOpen],
-            Section::Library => &[Flag::EnqueueDefault],
+            Section::Library => &[Flag::EnqueueDefault, Flag::HideExt],
             Section::Desktop => &[Flag::TrayIcon, Flag::MinimizeToTray, Flag::NotifyTracks, Flag::GlobalHotkeys],
             Section::Internet => &[Flag::CheckUpdates],
             Section::Shortcuts => &[],
