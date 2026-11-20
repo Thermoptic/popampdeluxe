@@ -21,6 +21,19 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-20   MEDIALIB WINDOW IN THE SHORTCUTS
+  ..........................................................................
+
+  Preferences > Shortcuts: the left-hand list of windows now has "MediaLib
+  Window" besides the Main, Equalizer and Playlist windows. A shortcut for
+  it works on the title bar of the Media Library window. Example:
+
+     MediaLib Window / Middle Mouse / Winshade All
+
+  A middle click on the title bar of the Media Library window then shades
+  all the windows, or unshades them when most are shaded.
+
+
   2026-11-20   WINSHADE AND WINSHADE ALL
   ..........................................................................
 

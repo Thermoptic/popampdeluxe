@@ -10,10 +10,11 @@ use popamp_core::Command;
 use popamp_skin::layout::WindowKey;
 
 /// The windows that have shortcuts.
-pub const TARGETS: [(WindowKey, &str, &str); 3] = [
+pub const TARGETS: [(WindowKey, &str, &str); 4] = [
     (WindowKey::Main, "main", "Main window"),
     (WindowKey::Eq, "eq", "Equalizer window"),
     (WindowKey::Playlist, "playlist", "Playlist window"),
+    (WindowKey::Library, "library", "MediaLib Window"),
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,7 +113,8 @@ mod tests {
         assert_eq!(shade_command(WindowKey::Main), Command::ToggleWindowshade);
         assert_eq!(shade_command(WindowKey::Eq), Command::ToggleEqShade);
         assert_eq!(shade_command(WindowKey::Playlist), Command::TogglePlShade);
-        let spec = "eq:middle:winshade;main:right:winshadeall";
+        let spec = "eq:middle:winshade;main:right:winshadeall;library:middle:winshadeall";
+        assert_eq!(find(spec, WindowKey::Library, Click::Middle), Some(Command::ToggleAllShades), "the Media Library window has them too");
         assert_eq!(find(spec, WindowKey::Eq, Click::Middle), Some(Command::ToggleWindowshade), "the action; the window decides which shade");
         assert_eq!(find(spec, WindowKey::Main, Click::Right), Some(Command::ToggleAllShades));
     }

@@ -37,6 +37,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **MediaLib Window** in Preferences > Shortcuts (the left-hand list of windows):
+  the title-bar shortcuts work on the Media Library window too, for example
+  Middle Mouse on its title bar = Winshade All.
 - **Winshade** and **Winshade All** in Preferences > Shortcuts (the right-hand list
   of actions). *Winshade* shades or unshades the window whose title bar was clicked,
   as its own shade button does, so any click or wheel turn can do it.
