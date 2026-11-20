@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The Media Library window of a classic skin has the playlist window's bottom
+  left, with the places of ADD, REM, SEL and MISC empty, instead of a cut-off
+  dark box.
+
 ### Added
 
 - **Groups in the Media Library folder tree.** A group is a folder-like heading

@@ -514,11 +514,11 @@ fn playlist_normal() -> Mode {
 
 /// The media library in the playlist editor's frame, which every classic
 /// skin has: its top without the title picture, its sides, and its bottom
-/// without the ADD, REM, SEL and MISC buttons. The small display shows
+/// as the playlist's, but with the places of the ADD, REM, SEL and MISC
+/// buttons left empty. The small display shows
 /// the library's state, the transport buttons work as in the playlist,
 /// and the LIST button opens the library's menu.
 fn library_window() -> WindowDef {
-    let bottom_left = Rect { w: 12, ..p::BOTTOM_LEFT };
     let mut v = vec![
         piece(Start(0), Start(0), pair_look(p::TOP_LEFT), 25, 20),
         Element::new(
@@ -528,8 +528,8 @@ fn library_window() -> WindowDef {
         piece(End(-25), Start(0), pair_look(p::TOP_RIGHT), 25, 20),
         tiles(span(Start(0), Start(20), Start(12), End(-38)), p::LEFT_TILE),
         tiles(span(End(-20), Start(20), End(0), End(-38)), p::RIGHT_TILE),
-        tiles(span(Start(12), End(-38), End(-150), End(0)), p::BOTTOM_TILE),
-        piece(Start(0), End(-38), Look::plain(paint(Sheet::PlEdit, bottom_left)), 12, 38),
+        tiles(span(Start(125), End(-38), End(-150), End(0)), p::BOTTOM_TILE),
+        piece(Start(0), End(-38), Look::plain(paint(Sheet::PlEdit, p::BOTTOM_LEFT)), 125, 38),
         piece(End(-150), End(-38), Look::plain(paint(Sheet::PlEdit, p::BOTTOM_RIGHT)), 150, 38),
         Element::new(span(Start(0), Start(0), End(0), Start(20)), Kind::Drag { double: Some(Command::ToggleLibraryShade) }).cursor(C::PTBar),
         button(span(End(-11), Start(3), End(-2), Start(12)), pl_overlay(p::CLOSE_PRESSED), Action::click(Command::ToggleLibraryWindow))
@@ -549,6 +549,14 @@ fn library_window() -> WindowDef {
         hot_spot(span(End(-44), End(-30), End(-22), End(-12)), Action::MenuOnRelease(MenuRef::Library)),
         Element::new(span(End(-20), End(-20), End(0), End(0)), Kind::Resize).cursor(C::PSize),
     ];
+    // The four buttons are in the picture of the bottom left: each place is
+    // painted over with the rows of the picture just below the buttons,
+    // which are the plain panel (it shades from left to right, so each
+    // place takes its own columns).
+    for k in 0..4 {
+        let x = 10 + 29 * k;
+        v.push(tiles(span(Start(x), End(-30), Start(x + 27), End(-12)), Rect { x, y: 99, w: 27, h: 4 }));
+    }
     v.extend(mini_transport());
     WindowDef {
         key: WindowKey::Library,
