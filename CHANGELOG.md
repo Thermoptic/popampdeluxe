@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The repository's `skins` folder holds only `popamp-classified.psz`. Winamp Classic
+  Amber is not shipped any more; the default skin is the built-in one, and a
+  missing skin file is no error.
+
 ### Fixed
 
 - The shaded playlist window of the *popamp-classified* theme (and any skin whose shade

@@ -21,6 +21,15 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-21   THE SKINS THAT COME WITH THE PLAYER
+  ..........................................................................
+
+  Winamp Classic Amber is no longer shipped with Popamp. The "skins" folder
+  that comes with the program holds only popamp-classified.psz. A new
+  installation starts with the built-in skin; the Skin Browser (Alt+S) lists
+  the skins in the folder, and any .wsz or .psz you drop in it.
+
+
   2026-11-20   ADD SHORTCUT
   ..........................................................................
 

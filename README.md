@@ -43,8 +43,9 @@ download: [popampdeluxe.txt](popampdeluxe.txt).*
 
 <p align="center"><img src="assets/screenshots/shortcuts.png" alt="Preferences, Shortcuts page"></p>
 
-- **A skin comes with the player.** Winamp Classic Amber is the skin a new
-  install starts with, in a `skins` folder with the program.
+- **A skin comes with the player.** `popamp-classified.psz` is in the `skins`
+  folder with the program; it shows up in the Skin Browser. Popamp starts with
+  its built-in skin.
 - **A `skins` folder beside the program.** Drop any `.wsz` in it and it
   shows up in the Skin Browser (Alt+S) at once, even while the browser is
   open.

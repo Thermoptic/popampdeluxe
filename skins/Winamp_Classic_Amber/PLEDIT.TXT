@@ -1,8 +1,0 @@
-[Text]
-Normal=#e79a36
-Current=#FFFFFF 
-NormalBG=#000000 
-SelectedBG=#76490e
-MbFG=#00FF00 
-MbBG=#000000 
-Font=Consolas
