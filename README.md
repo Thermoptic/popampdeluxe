@@ -1,4 +1,4 @@
-<h1 align="center">Popamp</h1>
+<h1 align="center">Popamp Deluxe</h1>
 
 ## What's new in Popamp Deluxe
 
