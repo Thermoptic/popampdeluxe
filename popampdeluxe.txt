@@ -21,6 +21,15 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-20   WINDOWS THE PLAYER OPENS STAY ABOVE IT
+  ..........................................................................
+
+  With "Always on top" on, the windows Popamp opens (Preferences, the Folder
+  and Group Editor, the Skin Browser, File info and so on) now always lie
+  above the player, as an exception. Before, clicking the player brought it
+  over the window you had just opened.
+
+
   2026-11-20   GROUPS IN THE FOLDERTREE, AND A FOLDER AND GROUP EDITOR
   ..........................................................................
 

@@ -833,8 +833,16 @@ impl App {
             .with_decorations(bar.is_none())
             .with_inner_size(platform::drawn_size(w, h, pct))
             .with_position(platform::position((cx - uw / 2).max(0), (cy - uh / 2).max(0)));
+        // With always on top on, the player's windows are above everything, and
+        // so are the windows it brings up: they stay above the player.
+        let attrs = if self.model.settings().aot { attrs.with_window_level(WindowLevel::AlwaysOnTop) } else { attrs };
         let Ok(window) = el.create_window(attrs).map(Arc::new) else { return };
         let Ok(surface) = Surface::soft(&window) else { return };
+        // Owned by the main window, which the system keeps below it.
+        let owner = self.win(WindowKey::Main).filter(|w| w.role == WindowRole::Main).and_then(|w| w.window.top()).map(|w| &**w);
+        if let Err(e) = self.platform.attach(&window, owner) {
+            log::warn!("cannot tie the dialog to the main window: {e}");
+        }
         let frame = Bitmap::new(w, h, 0);
         self.panels.push(PanelWindow { window, surface, panel, frame, pct, cursor: (0, 0), last_click: None, bar_h });
         self.panel_changed(self.panels.len() - 1);
@@ -1928,6 +1936,10 @@ impl App {
                         if let Some(w) = self.win(k).and_then(|w| w.window.top()) {
                             w.set_window_level(level);
                         }
+                    }
+                    // The dialogs go with the player: above it, and above all with it.
+                    for p in &self.panels {
+                        p.window.set_window_level(level);
                     }
                     self.render(WindowKey::Main);
                 }

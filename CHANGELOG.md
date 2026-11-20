@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- With *Always on top* on, the windows the player brings up (Preferences, the
+  editors, the Skin Browser and so on) stay above the player, instead of
+  going behind it when the player is clicked.
 - The Media Library window of a classic skin has the playlist window's bottom
   left, with the places of ADD, REM, SEL and MISC empty, instead of a cut-off
   dark box.
