@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Line spacing** (Preferences > Interface): a number, 3 by default (how the
+  rows have always been), for the space between the lines of text in the
+  playlist and the Media Library. From 0 to 30.
 - **Hide file extension** (Preferences > Media Library): on by default; when ticked
   the Foldertree writes names without `.mp3`, `.m3u` and so on, when not
   ticked every file shows its extension. Playlist files have an icon of

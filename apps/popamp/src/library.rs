@@ -146,6 +146,8 @@ const BUTTONS: [(&str, Command); 4] = [
 pub struct Place {
     pub r: Rect,
     pub px: i32,
+    /// Pixels between the lines of text.
+    pub gap: i32,
     pub thumb: Option<(i32, i32)>,
 }
 
@@ -185,9 +187,9 @@ impl Parts {
     /// the albums above the table. Each list keeps the right of its room
     /// for its scroll bar.
     pub(crate) fn new(at: Place, panes: bool) -> Parts {
-        let Place { r, px, .. } = at;
+        let Place { r, px, gap, .. } = at;
         let bar_w = at.thumb.map_or(OWN_BAR, |t| t.0);
-        let row_h = px + 3;
+        let row_h = px + gap;
         let bar_h = row_h + 4;
         let body_h = (r.h - bar_h - 2).max(0);
         let views_w = (r.w * 3 / 10).clamp(60, 120).min(r.w);
@@ -1254,7 +1256,7 @@ mod tests {
     const R: Rect = rect(0, 0, 400, 300);
     const PX: i32 = 10;
     /// With the classic skin's thumb, 8 by 18.
-    const AT: Place = Place { r: R, px: PX, thumb: Some((8, 18)) };
+    const AT: Place = Place { r: R, px: PX, gap: 3, thumb: Some((8, 18)) };
 
     fn track(path: &str, artist: &str, album: &str, title: &str) -> Track {
         Track { path: path.into(), artist: artist.into(), album: album.into(), title: title.into(), ..Track::default() }

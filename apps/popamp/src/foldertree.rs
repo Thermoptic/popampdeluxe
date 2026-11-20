@@ -691,7 +691,7 @@ mod tests {
 
     const R: Rect = rect(0, 0, 500, 300);
     const PX: i32 = 10;
-    const AT: Place = Place { r: R, px: PX, thumb: Some((8, 18)) };
+    const AT: Place = Place { r: R, px: PX, gap: 3, thumb: Some((8, 18)) };
 
     /// A music folder in a folder of this test's own:
     /// `Albums/` holding `b.mp3` and a folder `Live/`, plus `a.mp3`, `Z.MP3`,

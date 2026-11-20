@@ -448,6 +448,7 @@ impl Flag {
 pub enum Field {
     CustomFontSize,
     FontSize,
+    RowGap,
     TitleFormat,
     FadeMs,
     CrossfadeMs,
@@ -461,6 +462,7 @@ impl Field {
         match self {
             Field::CustomFontSize => "Size",
             Field::FontSize => "Playlist font size",
+            Field::RowGap => "Line spacing",
             Field::TitleFormat => "Title format",
             Field::FadeMs => "Fade-out (ms)",
             Field::CrossfadeMs => "Crossfade (ms)",
@@ -474,6 +476,7 @@ impl Field {
         match self {
             Field::CustomFontSize => s.font_size.to_string(),
             Field::FontSize => s.pe_fontsize.to_string(),
+            Field::RowGap => s.row_gap.to_string(),
             Field::TitleFormat => s.titlefmt.clone(),
             Field::FadeMs => s.fade_ms.to_string(),
             Field::CrossfadeMs => s.crossfade_ms.to_string(),
@@ -489,6 +492,7 @@ impl Field {
         match self {
             Field::CustomFontSize => number("Size"),
             Field::FontSize => number("Font size"),
+            Field::RowGap => number("Line spacing"),
             Field::FadeMs => number("Fade-out"),
             Field::CrossfadeMs => number("Crossfade"),
             Field::BufferMs => number("Output buffer"),
@@ -506,6 +510,7 @@ impl Field {
         match self {
             Field::CustomFontSize => model.settings_mut().font_size = n().min(1000) as i32,
             Field::FontSize => model.settings_mut().pe_fontsize = n().min(1000) as i32,
+            Field::RowGap => model.settings_mut().row_gap = n().min(30) as i32,
             Field::FadeMs => model.settings_mut().fade_ms = n(),
             Field::CrossfadeMs => model.settings_mut().crossfade_ms = n(),
             Field::BufferMs => model.settings_mut().buffer_ms = n(),
@@ -537,6 +542,7 @@ impl FileTypes {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Section {
     Windows,
+    Font,
     Interface,
     Playlist,
     Playback,
@@ -547,8 +553,9 @@ enum Section {
 }
 
 impl Section {
-    const ALL: [Section; 8] = [
+    const ALL: [Section; 9] = [
         Section::Windows,
+        Section::Font,
         Section::Interface,
         Section::Playlist,
         Section::Playback,
@@ -561,7 +568,8 @@ impl Section {
     fn label(self) -> &'static str {
         match self {
             Section::Windows => "Windows",
-            Section::Interface => "Font",
+            Section::Font => "Font",
+            Section::Interface => "Interface",
             Section::Playlist => "Playlist",
             Section::Playback => "Playback",
             Section::Library => "Media Library",
@@ -576,7 +584,8 @@ impl Section {
             Section::Windows => {
                 &[Flag::Snap, Flag::EasyMove, Flag::KeepOnScreen, Flag::AlwaysOnTop, Flag::DoubleSize, Flag::SkinCursors, Flag::ScrollTitle]
             }
-            Section::Interface => &[Flag::SkinBmpFont, Flag::CustomFont],
+            Section::Font => &[Flag::SkinBmpFont, Flag::CustomFont],
+            Section::Interface => &[],
             Section::Playlist => &[Flag::DimInactive, Flag::ShowNumbers, Flag::ZeroPad],
             Section::Playback => &[Flag::AutoAdvance, Flag::KeepScanOpen],
             Section::Library => &[Flag::EnqueueDefault, Flag::HideExt],
@@ -588,10 +597,11 @@ impl Section {
 
     fn fields(self) -> &'static [Field] {
         match self {
+            Section::Interface => &[Field::RowGap],
             Section::Playlist => &[Field::FontSize, Field::TitleFormat],
             Section::Playback => &[Field::FadeMs, Field::CrossfadeMs, Field::BufferMs, Field::SoundFont],
             Section::Internet => &[Field::Proxy],
-            Section::Windows | Section::Interface | Section::Library | Section::Desktop | Section::Shortcuts => &[],
+            Section::Windows | Section::Font | Section::Library | Section::Desktop | Section::Shortcuts => &[],
         }
     }
 }
@@ -645,7 +655,8 @@ impl Preferences {
             // The shortcut rows sit inside the frame.
             let inside = match section {
                 Section::Shortcuts => 16 + SHORTCUT_ROWS as i32 * 30,
-                Section::Interface => 62,
+                Section::Font => 62,
+                Section::Interface => 34,
                 _ => 0,
             };
             form.add_on(page, Rect::new(x0, 10, cw, 22 + rows * 22 + inside), Widget::Group { label: section.label().into() });
@@ -686,7 +697,7 @@ impl Preferences {
                     }
                     y += 30 + 2 * 22;
                 }
-                Section::Interface => {
+                Section::Font => {
                     // A font from a `fonts` folder, and its size beside it.
                     fonts = font_files.iter().filter_map(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned()).collect();
                     if !s.font_file.is_empty() && !fonts.iter().any(|f| *f == s.font_file) {
@@ -1502,6 +1513,27 @@ pub(crate) mod tests {
         assert_eq!((m.settings().pe_fontsize, m.settings().fade_ms), (14, 500));
         assert_eq!(m.settings().crossfade_ms, 10_000, "kept to ten seconds");
         assert_eq!(m.settings().titlefmt, "%title%!");
+    }
+
+    #[test]
+    fn the_interface_page_sets_the_line_spacing_of_the_lists() {
+        let mut m = songs(&["Alpha"]);
+        assert_eq!(m.settings().row_gap, 3, "the spacing the rows have always had");
+        assert_eq!(m.settings().list_row_h(), m.settings().list_font_px() + 3);
+        let mut p = Panel::open(PanelKind::Preferences, &m);
+        let Panel::Prefs(pr) = &p else { unreachable!() };
+        assert_eq!(pr.form.page_of(field(&p, Field::RowGap)), Section::ALL.iter().position(|&s| s == Section::Interface));
+        let Widget::Input { text, .. } = pr.form.widget(field(&p, Field::RowGap)) else { panic!() };
+        assert_eq!(text, "3", "the box starts with the present value");
+        retype(&mut p, &mut m, Field::RowGap, "7");
+        assert_eq!(m.settings().row_gap, 3, "applies on OK");
+        assert!(!press(&mut p, &mut m, Key::Enter));
+        assert_eq!(m.settings().row_gap, 7);
+        assert_eq!(m.settings().list_row_h(), m.settings().list_font_px() + 7);
+        let mut p = Panel::open(PanelKind::Preferences, &m);
+        retype(&mut p, &mut m, Field::RowGap, "99");
+        assert!(!press(&mut p, &mut m, Key::Enter));
+        assert_eq!(m.settings().row_gap, 30, "kept in range");
     }
 
     #[test]

@@ -269,6 +269,9 @@ settings! {
     eq_default_preamp: i32 = 31,
     // Playlist.
     pe_fontsize: i32 = 10,
+    /// Pixels between the lines of text of the playlist and the library
+    /// (Preferences > Interface). Three is how the rows have always been.
+    row_gap: i32 = 3,
     shownumsinpl: bool = true,
     zeropadplnum: bool = false,
     titlefmt: String = DEFAULT_TITLE_FORMAT.to_string(),
@@ -338,6 +341,11 @@ impl Settings {
         }
     }
 
+    /// The height of a row of the playlist and the library: the text and the gap.
+    pub fn list_row_h(&self) -> i32 {
+        self.list_font_px() + self.row_gap.clamp(0, 30)
+    }
+
     pub fn sanitize(&mut self) {
         self.volume = self.volume.clamp(0, 255);
         self.balance = self.balance.clamp(-127, 127);
@@ -347,6 +355,7 @@ impl Settings {
         self.ml_width = self.ml_width.max(275);
         self.ml_height = self.ml_height.max(116);
         self.pe_fontsize = self.pe_fontsize.clamp(6, 40);
+        self.row_gap = self.row_gap.clamp(0, 30);
         self.font_size = self.font_size.clamp(6, 40);
         self.snaplen = self.snaplen.clamp(0, 100);
         self.zoom = self.zoom.clamp(125, 300);
