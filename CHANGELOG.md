@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Preferences has the skin's title bar**: instead of the system's, the window
+  has the windowshade strip of the skin in use, with the window's name in the
+  middle and a close button. Drag the bar to move the window.
 - **Apply** button in Preferences: it does what OK does, and the window stays
   open, so you can try a change and go on.
 - **Line spacing** (Preferences > Interface): a number, 3 by default (how the

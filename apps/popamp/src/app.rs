@@ -98,6 +98,9 @@ struct PanelWindow {
     /// The mouse, in the form's dialog pixels.
     cursor: (i32, i32),
     last_click: Option<(Instant, (i32, i32))>,
+    /// The height of the skin's title bar above the form, in dialog pixels;
+    /// 0 when the window has the system's own title bar.
+    bar_h: i32,
 }
 
 enum Drag {
@@ -821,14 +824,19 @@ impl App {
         let monitor = self.main_monitor().map(|m| platform::monitor(&m));
         let (cx, cy) = monitor.map_or((640, 400), |m| (m.x + m.w / 2, m.y + m.h / 2));
         let (uw, uh) = (platform::from_drawn(w, pct), platform::from_drawn(h, pct));
+        // Preferences has the skin's own title bar, the library's windowshade strip.
+        let bar = if kind == PanelKind::Preferences { self.skin_bar(panel.form().w, pct) } else { None };
+        let bar_h = bar.as_ref().map_or(0, |b| crate::pen::dialog(pct, b.h));
+        let h = h + bar.as_ref().map_or(0, |b| b.h);
         let attrs = platform::attributes(WindowRole::Dialog)
             .with_title(panel.title())
+            .with_decorations(bar.is_none())
             .with_inner_size(platform::drawn_size(w, h, pct))
             .with_position(platform::position((cx - uw / 2).max(0), (cy - uh / 2).max(0)));
         let Ok(window) = el.create_window(attrs).map(Arc::new) else { return };
         let Ok(surface) = Surface::soft(&window) else { return };
         let frame = Bitmap::new(w, h, 0);
-        self.panels.push(PanelWindow { window, surface, panel, frame, pct, cursor: (0, 0), last_click: None });
+        self.panels.push(PanelWindow { window, surface, panel, frame, pct, cursor: (0, 0), last_click: None, bar_h });
         self.panel_changed(self.panels.len() - 1);
     }
 
@@ -853,20 +861,57 @@ impl App {
         ((factor * 100.0).round() as i32).max(100)
     }
 
+    /// The skin's windowshade strip as the title bar of a dialog `w` wide,
+    /// drawn at `pct`, or none when the skin has no library window or the
+    /// dialog has none of this kind.
+    fn skin_bar(&mut self, w: i32, pct: i32) -> Option<Bitmap> {
+        self.model.skin.layout.window(WindowKey::Library)?;
+        let (shaded, width) = (self.model.settings().ml_ws, self.model.settings().ml_width);
+        self.model.settings_mut().ml_ws = true;
+        self.model.settings_mut().ml_width = w;
+        let (_, h) = crate::bind::window_size(&self.model, WindowKey::Library);
+        let mut bar = Bitmap::new(crate::pen::screen(pct, w), crate::pen::screen(pct, h), 0);
+        if h > 0 {
+            let scale = Scale::new(pct, popamp_core::config::Scaling::Sharp);
+            SkinWin::new(WindowKey::Library).draw(&self.model, &mut self.fonts, &mut Canvas::new(&mut bar, scale), true);
+        }
+        self.model.settings_mut().ml_ws = shaded;
+        self.model.settings_mut().ml_width = width;
+        (h > 0).then_some(bar)
+    }
+
     fn render_panel(&mut self, i: usize) {
         let main_pct = self.dialog_pct();
+        let Some(p) = self.panels.get(i) else { return };
+        let bar_wanted = p.bar_h > 0;
+        let form_w = p.panel.form().w;
+        let bar_pct = if platform::DESKTOP_IN_POINTS { ((p.window.scale_factor() * 100.0).round() as i32).max(100) } else { main_pct };
+        let bar = if bar_wanted { self.skin_bar(form_w, bar_pct) } else { None };
         let Some(p) = self.panels.get_mut(i) else { return };
         // A dialog dragged to another screen is drawn at that screen's density.
         let pct = if platform::DESKTOP_IN_POINTS { ((p.window.scale_factor() * 100.0).round() as i32).max(100) } else { main_pct };
         let form = p.panel.form();
-        let (w, h) = (crate::pen::screen(pct, form.w), crate::pen::screen(pct, form.h));
+        let (w, body_h) = (crate::pen::screen(pct, form.w), crate::pen::screen(pct, form.h));
+        let bar_h = bar.as_ref().map_or(0, |b| b.h);
+        let h = body_h + bar_h;
         if (w, h) != (p.frame.w, p.frame.h) {
             // The windows changed size while the dialog was open.
             p.frame = Bitmap::new(w, h, 0);
             p.pct = pct;
             let _ = p.window.request_inner_size(platform::drawn_size(w, h, pct));
         }
-        form.draw(&mut Pen::new(&mut p.frame, &mut self.fonts.list, pct));
+        match bar {
+            None => form.draw(&mut Pen::new(&mut p.frame, &mut self.fonts.list, pct)),
+            Some(bar) => {
+                // The form is drawn on its own and set below the bar.
+                let mut body = Bitmap::new(w, body_h, 0);
+                form.draw(&mut Pen::new(&mut body, &mut self.fonts.list, pct));
+                p.frame.px[..bar.px.len()].copy_from_slice(&bar.px);
+                p.frame.px[bar.px.len()..].copy_from_slice(&body.px);
+                p.bar_h = crate::pen::dialog(pct, bar_h);
+                title_text(&mut p.frame, &mut self.fonts.list, pct, bar_h, p.panel.title());
+            }
+        }
         present_unscaled(&mut p.surface, &p.frame);
     }
 
@@ -882,9 +927,20 @@ impl App {
                 return;
             }
             WindowEvent::CursorMoved { position, .. } => {
-                p.cursor = (crate::pen::dialog(p.pct, position.x as i32), crate::pen::dialog(p.pct, position.y as i32));
+                // Dialog pixels, from the top of the form; above it is the title bar.
+                p.cursor = (crate::pen::dialog(p.pct, position.x as i32), crate::pen::dialog(p.pct, position.y as i32) - p.bar_h);
                 return;
             }
+            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } if y < 0 => {
+                // The skin's title bar: its close button, else the window is dragged.
+                if x >= form.w - CLOSE_W {
+                    Event::Cancel
+                } else {
+                    let _ = p.window.drag_window();
+                    return;
+                }
+            }
+            WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } if y < 0 => return,
             WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => {
                 let now = Instant::now();
                 let double = p.last_click.is_some_and(|(t, at)| now - t < Duration::from_millis(400) && at == (x, y));
@@ -1945,6 +2001,29 @@ impl App {
 
 /// Shows `frame` pixel for pixel: menus, tooltips and dialogs are drawn at
 /// the screen's resolution.
+/// How far from the right edge of a title bar the close button reaches, in
+/// dialog pixels: the strip's buttons are 11 wide.
+const CLOSE_W: i32 = 11;
+
+/// `text` in the middle of the title bar, which is `bar_h` screen pixels
+/// high at the top of `frame`. The bar behind the words is stretched from
+/// the pixel at their left, so the lines of the bar stop where they start.
+fn title_text(frame: &mut Bitmap, font: &mut crate::font::Font, pct: i32, bar_h: i32, text: &str) {
+    let words = text.to_uppercase();
+    let width = crate::pen::text_width(font, &words, pct);
+    let sw = crate::pen::screen(pct, width);
+    let (left, pad) = ((frame.w - sw) / 2, crate::pen::screen(pct, 6));
+    let (from, to) = ((left - pad).max(1), (left + sw + pad).min(frame.w));
+    for y in 0..bar_h {
+        let row = (y * frame.w) as usize;
+        let colour = frame.px[row + from as usize - 1];
+        frame.px[row + from as usize..row + to as usize].fill(colour);
+    }
+    let y = (crate::pen::dialog(pct, bar_h) - crate::menu::FONT_PX as i32) / 2;
+    let x = crate::pen::dialog(pct, left);
+    Pen::new(frame, font, pct).text(x, y, &words, crate::menu::TEXT, x, width + 2);
+}
+
 fn present_unscaled(surface: &mut Surface, frame: &Bitmap) {
     surface.present((frame.w, frame.h), |buf| Scale::ONE.present(frame, buf, frame.w as usize, frame.h as usize));
 }

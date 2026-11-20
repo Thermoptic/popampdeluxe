@@ -5,6 +5,8 @@
 *Updated 2026-11-19. The same list, as a text file that comes with every
 download: [popampdeluxe.txt](popampdeluxe.txt).*
 
+- **Preferences in the skin's own title bar.** The window uses the skin's
+  windowshade strip instead of the system's title bar.
 - **Apply button** in Preferences: OK without closing the window.
 - **Line spacing** (Preferences > Interface). Set the space between the lines
   of text in the playlist and the Media Library; 3 is the default.
