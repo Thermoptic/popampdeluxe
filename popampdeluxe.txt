@@ -21,20 +21,6 @@
 ------------------------------------------------------------------------------
 
 
-  2026-11-20   A TIMELINE IN THE SHADED MEDIA LIBRARY
-  ..........................................................................
-
-  When the Media Library is in windowshade mode, its title bar shows a
-  timeline for the song that is playing: a dark box in the middle half of
-  the bar, with a thin thumb in it. The thumb at the far left is the start
-  of the song, in the middle is half way through, at the far right is the
-  end. The box grows and shrinks with the window. Drag the thumb to jump to
-  another place in the song, as in the shaded main window.
-
-  (For skins with classic pictures. The title bars of dialogs, like
-  Preferences, have no timeline.)
-
-
   2026-11-20   ADD SHORTCUT
   ..........................................................................
 

@@ -129,11 +129,7 @@ impl Renderer {
         self.save(&mut m, WindowKey::Main, "main-scope")?;
         m.settings_mut().sa = 1;
         m.settings_mut().windowshade = true;
-        self.save(&mut m, WindowKey::Main, "main-shade-playing")?;
-        // The shaded library has the timeline of the song.
-        m.settings_mut().ml_ws = true;
-        m.settings_mut().ml_width = 550;
-        self.save(&mut m, WindowKey::Library, "library-shade-playing")
+        self.save(&mut m, WindowKey::Main, "main-shade-playing")
     }
 
     fn eq_preset(&self) -> Result<(), String> {

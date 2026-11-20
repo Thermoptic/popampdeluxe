@@ -37,12 +37,6 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- **A timeline in the shaded Media Library** (classic skins): the title bar of the
-  Media Library, shaded, shows the song's length in the middle half of the bar,
-  a dark box with a thumb. The thumb at the left is the start of the song, in
-  the middle half way, and so on. The box follows the width of the window, and
-  the thumb can be dragged to seek, as in the shaded main window. The bar of the
-  dialogs has none.
 - **Add shortcut** in Preferences > Shortcuts: a new installation has one row of
   title-bar shortcut; the button under the last row, at the right edge of the
   lists, adds another (up to ten). The rows you saved are shown again, at least

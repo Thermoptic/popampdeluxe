@@ -109,8 +109,6 @@ pub struct Model {
     pub config: Config,
     /// The keys of the keyboard shortcuts.
     pub keymap: crate::keymap::Keymap,
-    /// A window's title bar is being drawn for a dialog (see `Flag::DialogBar`).
-    pub dialog_bar: bool,
     pub playlist: Playlist,
     pub engine: Engine,
     pub format: Arc<Format>,
@@ -275,7 +273,6 @@ impl Model {
         let keymap = crate::keymap::Keymap::load(|id| config.hotkey(id));
         let mut m = Model {
             keymap,
-            dialog_bar: false,
             library,
             paths,
             config,
