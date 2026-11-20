@@ -12,7 +12,7 @@ download: [popampdeluxe.txt](popampdeluxe.txt).*
   windowshade strip instead of the system's title bar.
 - **Apply button** in Preferences: OK without closing the window.
 - **Line spacing** (Preferences > Interface). Set the space between the lines
-  of text in the playlist and the Media Library; 3 is the default.
+  of text in the playlist and the Media Library; 0 is the closest, 5 the default.
 - **Hide file extension** (Preferences > Media Library) and an icon of its own
   for playlist files in the Foldertree.
 - **Playlist files in the Foldertree**. .m3u/.pls files show in the right list;

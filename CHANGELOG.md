@@ -30,9 +30,10 @@ All notable changes to this project are documented here. The format follows
   middle and a close button. Drag the bar to move the window.
 - **Apply** button in Preferences: it does what OK does, and the window stays
   open, so you can try a change and go on.
-- **Line spacing** (Preferences > Interface): a number, 3 by default (how the
+- **Line spacing** (Preferences > Interface): a number, 5 by default (how the
   rows have always been), for the space between the lines of text in the
-  playlist and the Media Library. From 0 to 30.
+  playlist and the Media Library. 0 is the closest the lines can be, with a
+  pixel between the capital letters. From 0 to 30.
 - **Hide file extension** (Preferences > Media Library): on by default; when ticked
   the Foldertree writes names without `.mp3`, `.m3u` and so on, when not
   ticked every file shows its extension. Playlist files have an icon of

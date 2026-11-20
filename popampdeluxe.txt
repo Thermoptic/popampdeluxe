@@ -88,9 +88,10 @@
 
   Preferences > Interface > Line spacing
 
-  A number: the pixels between the lines of text in the Playlist window and
-  in the Media Library. It starts at 3, which is how the lists have always
-  been. Type another number (0 to 30) and press OK to change it.
+  A number: the space between the lines of text in the Playlist window and
+  in the Media Library. 0 is the closest the lines can be (one pixel
+  between the capital letters). It starts at 5, which is how the lists have
+  always been. Type another number (0 to 30) and press OK or Apply.
 
 
   2026-11-20   HIDE FILE EXTENSION, AND AN ICON FOR PLAYLISTS

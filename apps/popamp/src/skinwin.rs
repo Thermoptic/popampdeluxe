@@ -811,7 +811,7 @@ pub fn image_mask(model: &Model, mode: &Mode, size: (i32, i32), drawn: Scale, sh
 
 /// Where a library element with `thumb`, at `r`, puts the library.
 fn place(model: &Model, r: Rect, thumb: &Look) -> Place {
-    Place { r, px: model.settings().list_font_px(), gap: model.settings().row_gap.clamp(0, 30), thumb: thumb.normal.map(|p| (p.src.w, p.src.h)) }
+    Place { r, px: model.settings().list_font_px(), gap: model.settings().list_row_h() - model.settings().list_font_px(), thumb: thumb.normal.map(|p| (p.src.w, p.src.h)) }
 }
 
 fn draw_paint(b: &mut Canvas, skin: &Skin, p: Paint, r: Rect, fill: Fill) {

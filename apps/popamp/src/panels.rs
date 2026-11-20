@@ -1572,18 +1572,21 @@ pub(crate) mod tests {
     #[test]
     fn the_interface_page_sets_the_line_spacing_of_the_lists() {
         let mut m = songs(&["Alpha"]);
-        assert_eq!(m.settings().row_gap, 3, "the spacing the rows have always had");
-        assert_eq!(m.settings().list_row_h(), m.settings().list_font_px() + 3);
+        assert_eq!(m.settings().row_gap, 5);
+        assert_eq!(m.settings().list_row_h(), m.settings().list_font_px() + 3, "the rows are as high as they have always been");
+        m.settings_mut().row_gap = 0;
+        assert!(m.settings().list_row_h() < m.settings().list_font_px(), "0 is closer than the text's size");
+        m.settings_mut().row_gap = 5;
         let mut p = Panel::open(PanelKind::Preferences, &m);
         let Panel::Prefs(pr) = &p else { unreachable!() };
         assert_eq!(pr.form.page_of(field(&p, Field::RowGap)), Section::ALL.iter().position(|&s| s == Section::Interface));
         let Widget::Input { text, .. } = pr.form.widget(field(&p, Field::RowGap)) else { panic!() };
-        assert_eq!(text, "3", "the box starts with the present value");
+        assert_eq!(text, "5", "the box starts with the present value");
         retype(&mut p, &mut m, Field::RowGap, "7");
-        assert_eq!(m.settings().row_gap, 3, "applies on OK");
+        assert_eq!(m.settings().row_gap, 5, "applies on OK");
         assert!(!press(&mut p, &mut m, Key::Enter));
         assert_eq!(m.settings().row_gap, 7);
-        assert_eq!(m.settings().list_row_h(), m.settings().list_font_px() + 7);
+        assert_eq!(m.settings().list_row_h(), m.settings().list_row_least() + 7);
         let mut p = Panel::open(PanelKind::Preferences, &m);
         retype(&mut p, &mut m, Field::RowGap, "99");
         assert!(!press(&mut p, &mut m, Key::Enter));
