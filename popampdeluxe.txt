@@ -21,6 +21,15 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-20   APPLY BUTTON IN PREFERENCES
+  ..........................................................................
+
+  Preferences now has Apply, beside OK and Cancel. It does the same as OK:
+  the values you typed are stored and take effect. The window stays open, so
+  you can try a change and carry on. If a value is not valid, Apply says
+  which one, as OK does.
+
+
   2026-11-20   LINE SPACING
   ..........................................................................
 

@@ -36,6 +36,8 @@ pub enum PanelKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Act {
     Ok,
+    /// Preferences: what OK does, with the window kept open.
+    Apply,
     Close,
     /// Picks a picture for the cover in File info.
     ChangeCover,
@@ -786,7 +788,8 @@ impl Preferences {
             bottom = bottom.max(y);
         }
         let y = bottom + 10;
-        let status = form.add(Rect::new(x0, y, w - 2 * BUTTON.0 - 22 - x0, BUTTON.1), Widget::Label { text: String::new(), dim: false });
+        let status = form.add(Rect::new(x0, y, w - 3 * BUTTON.0 - 28 - x0, BUTTON.1), Widget::Label { text: String::new(), dim: false });
+        button(&mut form, w - 3 * BUTTON.0 - 22, y, "Apply", Act::Apply, false);
         button(&mut form, w - 2 * BUTTON.0 - 16, y, "OK", Act::Ok, true);
         button(&mut form, w - BUTTON.0 - 10, y, "Cancel", Act::Close, false);
         form.h = y + BUTTON.1 + 10;
@@ -822,6 +825,13 @@ impl Preferences {
                 true
             }
             Event::Clicked(Act::Ok) => self.apply(model),
+            Event::Clicked(Act::Apply) => {
+                // The same as OK, and the window stays.
+                if !self.apply(model) {
+                    self.form.set_label(self.status, "Applied".into());
+                }
+                true
+            }
             #[cfg(windows)]
             Event::Clicked(Act::DefaultApps) => {
                 crate::filetypes::open_default_apps();
@@ -1534,6 +1544,22 @@ pub(crate) mod tests {
         retype(&mut p, &mut m, Field::RowGap, "99");
         assert!(!press(&mut p, &mut m, Key::Enter));
         assert_eq!(m.settings().row_gap, 30, "kept in range");
+    }
+
+    #[test]
+    fn apply_stores_what_ok_stores_and_keeps_the_window_open() {
+        let mut m = songs(&["Alpha"]);
+        let mut p = Panel::open(PanelKind::Preferences, &m);
+        retype(&mut p, &mut m, Field::FontSize, "14");
+        let Panel::Prefs(pr) = &mut p else { unreachable!() };
+        assert!(pr.handle(Event::Clicked(Act::Apply), &mut m), "still open");
+        assert_eq!(m.settings().pe_fontsize, 14, "stored at once");
+        // A bad value is refused, as with OK, and the window stays too.
+        retype(&mut p, &mut m, Field::FadeMs, "soon");
+        let Panel::Prefs(pr) = &mut p else { unreachable!() };
+        assert!(pr.handle(Event::Clicked(Act::Apply), &mut m));
+        let status = pr.form.widget(pr.status).clone();
+        assert!(matches!(status, Widget::Label { text, .. } if text.contains("Fade-out")));
     }
 
     #[test]
