@@ -310,7 +310,9 @@ pub mod pl {
     pub const SHADE_PRESSED: Rect = r(62, 42, 9, 9);
     pub const SHADE_LEFT: (Rect, Rect) = (r(72, 42, 25, 14), r(72, 57, 25, 14));
     pub const SHADE_RIGHT: (Rect, Rect) = (r(99, 42, 50, 14), r(99, 57, 50, 14));
-    pub const SHADE_TILE: Rect = r(72, 57, 25, 14);
+    /// The middle of the shade strip: a stretch from inside the left piece, which has
+    /// an edge of its own at its left that must not repeat.
+    pub const SHADE_TILE: Rect = r(80, 57, 10, 14);
 
     /// Pop-up menu buttons (normal, pressed) for ADD, REM, SEL, MISC, LIST,
     /// listed bottom-up as they stack above the bar button.

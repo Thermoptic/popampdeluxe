@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- The shaded playlist window of the *popamp-classified* theme (and any skin whose shade
+  strip has an edge at the left end of its picture) no longer shows a row of boxes
+  along the bar: the middle of the strip repeats a stretch from inside the left piece,
+  not the piece with its edge.
 - The REM button of the playlist window (classic skins): its first menu item, the
   one over the button that a click chooses, is now ALL (remove all) and MISC
   has the last place. They changed places.
