@@ -526,6 +526,17 @@ impl Field {
         }
     }
 
+    /// The least, the most and the step of a field that holds a number.
+    fn range(self) -> Option<(i64, i64, i64)> {
+        match self {
+            Field::CustomFontSize | Field::FontSize => Some((6, 40, 1)),
+            Field::RowGap => Some((0, 30, 1)),
+            Field::FadeMs | Field::CrossfadeMs => Some((0, 10_000, 50)),
+            Field::BufferMs => Some((40, 2000, 10)),
+            Field::TitleFormat | Field::Proxy | Field::SoundFont => None,
+        }
+    }
+
     /// Checks `text` without changing anything.
     fn check(self, text: &str) -> Result<(), String> {
         let number = |what| text.trim().parse::<u32>().map(drop).map_err(|_| format!("{what}: enter a whole number"));
@@ -837,6 +848,14 @@ impl Preferences {
         button(&mut form, w - 2 * BUTTON.0 - 16, y, "OK", Act::Ok, true);
         button(&mut form, w - BUTTON.0 - 10, y, "Cancel", Act::Close, false);
         form.h = y + BUTTON.1 + 10;
+        // A field shows its caret only once it is clicked; the arrow keys
+        // and the wheel change a number.
+        form.set_quiet();
+        for &(f, i) in &fields {
+            if let Some((least, most, step)) = f.range() {
+                form.number(i, least, most, step);
+            }
+        }
         // The list of sections runs down to the buttons, room to spare.
         form.add(Rect::new(10, 10, 140, form.h - 20), Widget::Pages { labels, selected: 0, action: Act::Section });
         Preferences {
@@ -1607,6 +1626,47 @@ pub(crate) mod tests {
         assert!(pr.handle(Event::Clicked(Act::Apply), &mut m));
         let status = pr.form.widget(pr.status).clone();
         assert!(matches!(status, Widget::Label { text, .. } if text.contains("Fade-out")));
+    }
+
+    #[test]
+    fn a_field_has_its_caret_only_when_clicked_and_a_number_follows_the_arrows_and_the_wheel() {
+        let mut m = songs(&["Alpha"]);
+        let mut p = Panel::open(PanelKind::Preferences, &m);
+        let i = field(&p, Field::RowGap);
+        let r = reach(&mut p, &mut m, i);
+        assert_eq!(p.form().focused(), None, "no caret: nothing is clicked");
+        let number = |p: &Panel| p.form().text(i).to_string();
+        assert_eq!(number(&p), "5");
+        press(&mut p, &mut m, Key::Up);
+        assert_eq!(number(&p), "5", "the arrows do nothing to a field not clicked");
+        click(&mut p, &mut m, r);
+        assert_eq!(p.form().focused(), Some(i), "clicked: the caret shows");
+        press(&mut p, &mut m, Key::Up);
+        press(&mut p, &mut m, Key::Up);
+        assert_eq!(number(&p), "7", "up raises it");
+        press(&mut p, &mut m, Key::Down);
+        assert_eq!(number(&p), "6", "down lowers it");
+        // The wheel over the box: up raises, down lowers.
+        let ev = p.form_mut().wheel_at(r.x + 3, r.y + 3, 2);
+        assert_eq!(ev, Event::Edited);
+        assert_eq!(number(&p), "8");
+        p.form_mut().wheel_at(r.x + 3, r.y + 3, -3);
+        assert_eq!(number(&p), "5");
+        for _ in 0..40 {
+            p.form_mut().wheel_at(r.x + 3, r.y + 3, -1);
+        }
+        assert_eq!(number(&p), "0", "not below the least");
+        // A click on something else lets go of the keyboard.
+        let hide = check_index(&p, Flag::HideExt);
+        let other = reach(&mut p, &mut m, hide);
+        click(&mut p, &mut m, other);
+        assert_eq!(p.form().focused(), None);
+        // And OK stores what the number says.
+        let r = reach(&mut p, &mut m, i);
+        click(&mut p, &mut m, r);
+        press(&mut p, &mut m, Key::Up);
+        assert!(!press(&mut p, &mut m, Key::Enter));
+        assert_eq!(m.settings().row_gap, 1);
     }
 
     #[test]

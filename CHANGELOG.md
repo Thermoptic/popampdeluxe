@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- In Preferences the white caret of a box shows only when you click the box,
+  not all the time. In a box that holds a number, the up and down keys, and
+  the mouse wheel over it, raise and lower the number (up: more).
 - With *Always on top* on, the windows the player brings up (Preferences, the
   editors, the Skin Browser and so on) stay above the player, instead of
   going behind it when the player is clicked.

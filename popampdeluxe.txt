@@ -21,6 +21,20 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-20   NUMBER BOXES IN PREFERENCES
+  ..........................................................................
+
+  The white line (the caret) in the boxes of Preferences now shows only
+  when you click a box, not all the time.
+
+  In a box that holds a number (Line spacing, the font sizes, the fade and
+  crossfade times, the output buffer) you can change the number without
+  typing: press the Up or Down arrow key while the box is clicked, or put
+  the mouse over the box and turn the wheel. Up and wheel up raise the
+  number, down lowers it. The number stays between the least and most the
+  box accepts. Press OK or Apply to keep it.
+
+
   2026-11-20   WINDOWS THE PLAYER OPENS STAY ABOVE IT
   ..........................................................................
 

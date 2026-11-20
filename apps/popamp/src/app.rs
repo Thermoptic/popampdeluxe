@@ -965,13 +965,14 @@ impl App {
                 p.panel.mouse_release();
                 ev
             }
-            WindowEvent::MouseWheel { delta, .. } => {
-                form.wheel(match delta {
+            WindowEvent::MouseWheel { delta, .. } => form.wheel_at(
+                x,
+                y,
+                match delta {
                     MouseScrollDelta::LineDelta(_, y) => y.round() as i32,
                     MouseScrollDelta::PixelDelta(p) => (p.y / 20.0).round() as i32,
-                });
-                Event::None
-            }
+                },
+            ),
             WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
                 match form_key(&event, self.mods.control_key() || self.mods.alt_key()) {
                     Some(k) => form.key(k),

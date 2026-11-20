@@ -146,11 +146,17 @@ pub struct Form<A> {
     pressed: Option<usize>,
     /// The drop-down whose options are showing.
     open: Option<usize>,
+    /// The keyboard goes to a field only when the mouse (or Tab) puts it
+    /// there: no caret shows until a field is clicked.
+    quiet: bool,
+    /// The fields that hold a number: control, least, most and the step of
+    /// the arrow keys and the wheel.
+    numbers: Vec<(usize, i64, i64, i64)>,
 }
 
 impl<A: Copy + PartialEq> Form<A> {
     pub fn new(w: i32, h: i32) -> Form<A> {
-        Form { w, h, controls: Vec::new(), pages: Vec::new(), page: 0, focus: None, pressed: None, open: None }
+        Form { w, h, controls: Vec::new(), pages: Vec::new(), page: 0, focus: None, pressed: None, open: None, quiet: false, numbers: Vec::new() }
     }
 
     /// Adds a control shown on every page and returns its index. The first
@@ -168,7 +174,7 @@ impl<A: Copy + PartialEq> Form<A> {
         let i = self.controls.len();
         self.controls.push((rect, widget));
         self.pages.push(page);
-        if self.focus.is_none() && self.focusable(i) {
+        if self.focus.is_none() && self.focusable(i) && !self.quiet {
             self.focus = Some(i);
         }
         i
@@ -201,7 +207,48 @@ impl<A: Copy + PartialEq> Form<A> {
     fn show_page(&mut self, page: usize) {
         self.page = page;
         if !self.focus.is_some_and(|f| self.shown(f)) {
-            self.focus = (0..self.controls.len()).find(|&i| self.focusable(i));
+            self.focus = if self.quiet { None } else { (0..self.controls.len()).find(|&i| self.focusable(i)) };
+        }
+    }
+
+    /// The control that has the keyboard.
+    #[cfg(test)]
+    pub fn focused(&self) -> Option<usize> {
+        self.focus
+    }
+
+    /// Makes the keyboard go to no field until one is clicked.
+    pub fn set_quiet(&mut self) {
+        self.quiet = true;
+        self.focus = None;
+    }
+
+    /// Field `i` holds a whole number from `least` to `most`: the up and
+    /// down keys, and the wheel over it, change it by `step`.
+    pub fn number(&mut self, i: usize, least: i64, most: i64, step: i64) {
+        self.numbers.push((i, least, most, step));
+    }
+
+    /// Changes the number in field `i` by `times` steps.
+    fn bump(&mut self, i: usize, times: i64) -> Event<A> {
+        let Some(&(_, least, most, step)) = self.numbers.iter().find(|n| n.0 == i) else { return Event::None };
+        let Widget::Input { text, cursor } = &mut self.controls[i].1 else { return Event::None };
+        let now = text.trim().parse::<i64>().unwrap_or(least);
+        *text = (now + times * step).clamp(least, most).to_string();
+        *cursor = text.chars().count();
+        Event::Edited
+    }
+
+    /// The wheel at `(x, y)`: over a number it changes the number (up: more),
+    /// else it scrolls the list.
+    pub fn wheel_at(&mut self, x: i32, y: i32, steps: i32) -> Event<A> {
+        let over = self.numbers.iter().map(|n| n.0).find(|&i| self.shown(i) && self.controls[i].0.contains(x, y));
+        match over {
+            Some(i) => self.bump(i, i64::from(steps)),
+            None => {
+                self.wheel(steps);
+                Event::None
+            }
         }
     }
 
@@ -406,8 +453,14 @@ impl<A: Copy + PartialEq> Form<A> {
             let (r, w) = &self.controls[i];
             self.shown(i) && r.contains(x, y) && !matches!(w, Widget::Label { .. } | Widget::Group { .. } | Widget::Image { .. })
         }) else {
+            if self.quiet {
+                self.focus = None;
+            }
             return Event::None;
         };
+        if self.quiet && !matches!(self.controls[i].1, Widget::Input { .. } | Widget::List { .. }) {
+            self.focus = None;
+        }
         let rect = self.controls[i].0;
         match &mut self.controls[i].1 {
             Widget::Input { text, cursor } => {
@@ -501,6 +554,11 @@ impl<A: Copy + PartialEq> Form<A> {
             Key::Tab => {
                 self.focus_next();
                 return Event::None;
+            }
+            // In a number the arrows change it.
+            Key::Up | Key::Down if self.focus.is_some_and(|f| self.numbers.iter().any(|n| n.0 == f)) => {
+                let f = self.focus.unwrap_or(0);
+                return self.bump(f, if key == Key::Up { 1 } else { -1 });
             }
             // The arrows move the list even while typing in a search field.
             Key::Up | Key::Down | Key::PageUp | Key::PageDown => return self.move_selection(key),
