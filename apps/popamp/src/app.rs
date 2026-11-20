@@ -826,8 +826,8 @@ impl App {
         let monitor = self.main_monitor().map(|m| platform::monitor(&m));
         let (cx, cy) = monitor.map_or((640, 400), |m| (m.x + m.w / 2, m.y + m.h / 2));
         let (uw, uh) = (platform::from_drawn(w, pct), platform::from_drawn(h, pct));
-        // Preferences has the skin's own title bar, the library's windowshade strip.
-        let bar = if kind == PanelKind::Preferences { self.skin_bar(panel.form().w, pct) } else { None };
+        // The dialogs have the skin's own title bar, the library's windowshade strip.
+        let bar = self.skin_bar(panel.form().w, pct);
         let bar_h = bar.as_ref().map_or(0, |b| crate::pen::dialog(pct, b.h));
         let h = h + bar.as_ref().map_or(0, |b| b.h);
         let attrs = platform::attributes(WindowRole::Dialog)

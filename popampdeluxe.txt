@@ -117,11 +117,13 @@
   2026-11-20   PREFERENCES WITH THE SKIN'S TITLE BAR
   ..........................................................................
 
-  The Preferences window no longer has the system's title bar. It has the
-  title bar of the skin you use (the thin strip a shaded window has), with
-  the name of the window in the middle and a close button at the right.
-  Drag the bar to move the window. If a skin has no such strip, the window
-  keeps the system's title bar.
+  The windows Popamp opens (Preferences, Skin Browser, File info, the Folder
+  and Group Editor, History and the others) no longer have the system's
+  title bar. They have the title bar of the skin you use (the thin strip a
+  shaded window has), with the name of the window in the middle and a close
+  button at the right. Drag the bar to move the window. If a skin has no
+  such strip, the windows keep the system's title bar. The dialogs of
+  Windows itself, such as the file picker, keep theirs.
 
 
   2026-11-20   APPLY BUTTON IN PREFERENCES

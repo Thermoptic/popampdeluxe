@@ -915,7 +915,7 @@ mod tests {
 
     #[test]
     fn a_group_holds_folders_and_a_click_on_it_folds_them_in_and_out() {
-        let (root, mut t) = grouped("fold");
+        let (root, mut t) = grouped("grp-fold");
         assert_eq!(t.shown(), [0, 1, 2, 3], "all shown: the group is unfolded");
         assert_eq!(t.items[2].label(), "Live", "a folder can have a name of its own");
         assert_eq!(t.items[3].label(), "Albums", "else its own name");
@@ -941,7 +941,7 @@ mod tests {
 
     #[test]
     fn the_keys_skip_a_group_and_a_folded_group_hides_its_folders_from_them() {
-        let (root, mut t) = grouped("keys");
+        let (root, mut t) = grouped("grp-keys");
         t.focus = Some(List::Views);
         t.pick_root(0);
         t.key(AT, Key::Down, false);
@@ -953,7 +953,7 @@ mod tests {
 
     #[test]
     fn a_group_and_a_folder_in_it_have_their_own_icons() {
-        let (root, t) = grouped("icons");
+        let (root, t) = grouped("grp-icons");
         let mut b = popamp_skin::Bitmap::new(500, 300, 0);
         let mut font = crate::font::Fonts::for_skin(&popamp_skin::Skin::builtin_vector(None)).list;
         let c = PlColors { normal: 0xffffff, normal_bg: 0x000000, current: 0xffffff, selected_bg: 0x222222, font: String::new() };

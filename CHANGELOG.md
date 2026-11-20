@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Every window the player opens (Preferences, Skin Browser, File info, the Folder
+  and Group Editor, History, Jump to file and the rest) has the skin's own title
+  bar, not the system's. Dialogs of the operating system, such as the file
+  picker, keep theirs.
 - The Media Library's windowshade strip, and the title bar of Preferences, are the
   top of the playlist window (with its lines in the colours of the skin) instead of
   the playlist's shade strip, which some skins draw in other colours. They are
