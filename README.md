@@ -16,7 +16,7 @@ download: [popampdeluxe.txt](popampdeluxe.txt).*
   of library window: add folders on the left, browse them like Explorer on
   the right, by file name, sorted by title or date.
 
-  <img src="assets/screenshots/media-library.png" width="560" alt="The Media Library as a Foldertree, with folders and playlist files">
+<p align="center"><img src="assets/screenshots/media-library.png" alt="The Media Library as a Foldertree, with folders and playlist files"></p>
 
 - **A custom font** (Preferences > Font). Pick any `.ttf` or `.otf`
   from the `fonts` folder and a size, for the playlist, library, menus and
