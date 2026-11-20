@@ -919,7 +919,6 @@ impl App {
                 p.frame.px[..bar.px.len()].copy_from_slice(&bar.px);
                 p.frame.px[bar.px.len()..].copy_from_slice(&body.px);
                 p.bar_h = crate::pen::dialog(pct, bar_h);
-                title_text(&mut p.frame, &mut self.fonts.list, pct, bar_h, p.panel.title());
             }
         }
         present_unscaled(&mut p.surface, &p.frame);
@@ -1958,25 +1957,6 @@ impl App {
 /// How far from the right edge of a title bar the close button reaches, in
 /// dialog pixels: the strip's buttons are 11 wide.
 const CLOSE_W: i32 = 11;
-
-/// `text` in the middle of the title bar, which is `bar_h` screen pixels
-/// high at the top of `frame`. The bar behind the words is stretched from
-/// the pixel at their left, so the lines of the bar stop where they start.
-fn title_text(frame: &mut Bitmap, font: &mut crate::font::Font, pct: i32, bar_h: i32, text: &str) {
-    let words = text.to_uppercase();
-    let width = crate::pen::text_width(font, &words, pct);
-    let sw = crate::pen::screen(pct, width);
-    let (left, pad) = ((frame.w - sw) / 2, crate::pen::screen(pct, 6));
-    let (from, to) = ((left - pad).max(1), (left + sw + pad).min(frame.w));
-    for y in 0..bar_h {
-        let row = (y * frame.w) as usize;
-        let colour = frame.px[row + from as usize - 1];
-        frame.px[row + from as usize..row + to as usize].fill(colour);
-    }
-    let y = (crate::pen::dialog(pct, bar_h) - crate::menu::FONT_PX as i32) / 2;
-    let x = crate::pen::dialog(pct, left);
-    Pen::new(frame, font, pct).text(x, y, &words, crate::menu::TEXT, x, width + 2);
-}
 
 fn present_unscaled(surface: &mut Surface, frame: &Bitmap) {
     surface.present((frame.w, frame.h), |buf| Scale::ONE.present(frame, buf, frame.w as usize, frame.h as usize));
