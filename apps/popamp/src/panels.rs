@@ -55,6 +55,8 @@ pub enum Act {
     HotkeyClear,
     HotkeyDefault,
     HotkeysAllDefault,
+    /// Preferences > Shortcuts: one more row of shortcut.
+    ShortcutAdd,
     /// Picks a picture for the cover in File info.
     ChangeCover,
     RemoveCover,
@@ -699,6 +701,11 @@ pub struct Preferences {
     font_choice: usize,
     /// The check boxes of the media library types: the tags, the folder tree.
     library_type: [usize; 2],
+    /// The rows of shortcuts shown (the others are put away until Add
+    /// shortcut asks for them), the frame round them and the button.
+    shortcut_shown: usize,
+    shortcut_frame: usize,
+    shortcut_add: usize,
     /// Hotkeys: the list of shortcuts, one row to each in `keymap::BINDINGS`,
     /// and the line that says what is going on.
     hotkey_list: usize,
@@ -727,8 +734,8 @@ pub fn hotkey_rows(keymap: &crate::keymap::Keymap) -> Vec<String> {
         .collect()
 }
 
-/// Shortcut rows on the Shortcuts page.
-const SHORTCUT_ROWS: usize = 6;
+/// The most shortcut rows the Shortcuts page can show.
+const SHORTCUT_ROWS: usize = 10;
 
 /// Rows the device list shows at once.
 const DEVICE_ROWS: i32 = 4;
@@ -751,6 +758,8 @@ impl Preferences {
         let mut type_checks = [0; 3];
         let mut device_list = 0;
         let mut shortcut_rows = Vec::new();
+        let (mut shortcut_frame, mut shortcut_add) = (0, 0);
+        let shortcut_rules = shortcuts::parse(&s.title_shortcuts).len().clamp(1, SHORTCUT_ROWS);
         let mut fonts: Vec<String> = Vec::new();
         let mut font_choice = 0;
         let mut library_type = [0; 2];
@@ -766,7 +775,10 @@ impl Preferences {
                 Section::Interface => 28,
                 _ => 0,
             };
-            form.add_on(page, Rect::new(x0, 10, cw, 22 + rows * 22 + inside), Widget::Group { label: section.label().into() });
+            let frame = form.add_on(page, Rect::new(x0, 10, cw, 22 + rows * 22 + inside), Widget::Group { label: section.label().into() });
+            if section == Section::Shortcuts {
+                shortcut_frame = frame;
+            }
             for (n, &f) in flags.iter().enumerate() {
                 form.add_on(
                     page,
@@ -866,8 +878,11 @@ impl Preferences {
                         ];
                         shortcut_rows.push(row);
                     }
-                    // Room for the options of the last row to open.
-                    y += SHORTCUT_ROWS as i32 * 30 + 200;
+                    // The button for one more row, under the last, at the right
+                    // edge of the drop-downs; its place is set by `layout_shortcuts`.
+                    let at = Rect::new(x0 + cw - 12 - BUTTON.0, y, BUTTON.0, BUTTON.1);
+                    shortcut_add = form.add_on(page, at, Widget::Button { label: "Add shortcut".into(), action: Act::ShortcutAdd, default: false });
+                    y += SHORTCUT_ROWS as i32 * 30 + 30 + 10;
                 }
                 Section::Hotkeys => {
                     let list = Widget::List { rows: vec![], selected: None, scroll: 0 };
@@ -936,7 +951,7 @@ impl Preferences {
         }
         // The list of sections runs down to the buttons, room to spare.
         form.add(Rect::new(10, 10, 140, form.h - 20), Widget::Pages { labels, selected: 0, action: Act::Section });
-        Preferences {
+        let mut prefs = Preferences {
             form,
             file_types,
             #[cfg(linux_like)]
@@ -949,10 +964,35 @@ impl Preferences {
             fonts,
             font_choice,
             library_type,
+            shortcut_shown: shortcut_rules,
+            shortcut_frame,
+            shortcut_add,
             hotkey_list,
             hotkey_status,
             capturing: None,
+        };
+        prefs.layout_shortcuts();
+        prefs
+    }
+
+    /// Shows the rows of shortcuts asked for, puts the others away, and sets
+    /// the frame round them and the Add shortcut button, which sits under
+    /// the last row at the right edge of the drop-downs.
+    fn layout_shortcuts(&mut self) {
+        let (x0, cw) = (160, 560 - 170);
+        let rows = self.shortcut_shown;
+        for (n, row) in self.shortcut_rows.iter().enumerate() {
+            for &i in row {
+                self.form.set_hidden(i, n >= rows);
+            }
         }
+        let button_y = 42 + rows as i32 * 30;
+        let at = Rect::new(x0 + cw - 12 - BUTTON.0, button_y, BUTTON.0, BUTTON.1);
+        self.form.set_rect(self.shortcut_add, at);
+        self.form.set_hidden(self.shortcut_add, rows >= SHORTCUT_ROWS);
+        // The frame ends 12 below the last of the rows and the button.
+        let last = if rows >= SHORTCUT_ROWS { button_y - 30 + BUTTON.1 } else { button_y + BUTTON.1 };
+        self.form.set_rect(self.shortcut_frame, Rect::new(x0, 10, cw, last + 12 - 10));
     }
 
     /// Makes the picked shortcut wait for the keys to give it.
@@ -999,6 +1039,13 @@ impl Preferences {
             self.form.set_label(self.hotkey_status, "Pick a shortcut, then Change.".into());
         }
         match ev {
+            Event::Clicked(Act::ShortcutAdd) => {
+                if self.shortcut_shown < SHORTCUT_ROWS {
+                    self.shortcut_shown += 1;
+                    self.layout_shortcuts();
+                }
+                true
+            }
             Event::Clicked(Act::HotkeyChange) => {
                 self.start_capture(false);
                 true
@@ -1075,6 +1122,7 @@ impl Preferences {
         let rules: Vec<shortcuts::Rule> = self
             .shortcut_rows
             .iter()
+            .take(self.shortcut_shown)
             .filter_map(|&[w, c, a]| {
                 Some(shortcuts::Rule {
                     window: shortcuts::TARGETS.get(self.form.choice(w))?.0,
@@ -1667,6 +1715,12 @@ pub(crate) mod tests {
         pick(&mut p, &mut m, w, 1);
         pick(&mut p, &mut m, c, 1);
         pick(&mut p, &mut m, a, 3);
+        // Only one row at first; Add shortcut gives another.
+        let Panel::Prefs(pr) = &p else { unreachable!() };
+        assert_eq!(pr.shortcut_shown, 1, "a new installation has one row");
+        push(&mut p, &mut m, Act::ShortcutAdd);
+        let Panel::Prefs(pr) = &p else { unreachable!() };
+        assert_eq!(pr.shortcut_shown, 2);
         let [_, c, a] = rows(&p)[1];
         pick(&mut p, &mut m, c, 0);
         pick(&mut p, &mut m, a, 2);
@@ -1680,6 +1734,7 @@ pub(crate) mod tests {
         assert_eq!(picked(pr.shortcut_rows[0]), [1, 1, 3]);
         assert_eq!(picked(pr.shortcut_rows[1]), [0, 0, 2]);
         assert_eq!(picked(pr.shortcut_rows[2]), [0, 0, 0], "the others are empty");
+        assert_eq!(pr.shortcut_shown, 2, "the saved rules are the rows shown again");
     }
 
     #[test]

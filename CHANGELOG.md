@@ -37,6 +37,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Add shortcut** in Preferences > Shortcuts: a new installation has one row of
+  title-bar shortcut; the button under the last row, at the right edge of the
+  lists, adds another (up to ten). The rows you saved are shown again, at least
+  one. A drop-down near the bottom of the window opens upward when there is no
+  room below it.
 - **MediaLib Window** in Preferences > Shortcuts (the left-hand list of windows):
   the title-bar shortcuts work on the Media Library window too, for example
   Middle Mouse on its title bar = Winshade All.

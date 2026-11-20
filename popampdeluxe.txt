@@ -21,6 +21,18 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-20   ADD SHORTCUT
+  ..........................................................................
+
+  Preferences > Shortcuts
+
+  The page starts with one row of shortcut (window / mouse button /
+  action). Press "Add shortcut", under the last row at the right, to get
+  another row. There can be ten. A row left at "(nothing)" saves nothing.
+  When you open Preferences again, the rows you saved are there, at least
+  one.
+
+
   2026-11-20   MEDIALIB WINDOW IN THE SHORTCUTS
   ..........................................................................
 

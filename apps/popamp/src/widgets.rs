@@ -140,6 +140,8 @@ pub struct Form<A> {
     controls: Vec<(Rect, Widget<A>)>,
     /// The page each control is on; `None`: on every page.
     pages: Vec<Option<usize>>,
+    /// Controls that are put away for now: not drawn, not clicked.
+    hidden: Vec<bool>,
     /// The page shown.
     page: usize,
     focus: Option<usize>,
@@ -157,7 +159,7 @@ pub struct Form<A> {
 
 impl<A: Copy + PartialEq> Form<A> {
     pub fn new(w: i32, h: i32) -> Form<A> {
-        Form { w, h, controls: Vec::new(), pages: Vec::new(), page: 0, focus: None, pressed: None, open: None, quiet: false, numbers: Vec::new() }
+        Form { w, h, controls: Vec::new(), pages: Vec::new(), hidden: Vec::new(), page: 0, focus: None, pressed: None, open: None, quiet: false, numbers: Vec::new() }
     }
 
     /// Adds a control shown on every page and returns its index. The first
@@ -175,6 +177,7 @@ impl<A: Copy + PartialEq> Form<A> {
         let i = self.controls.len();
         self.controls.push((rect, widget));
         self.pages.push(page);
+        self.hidden.push(false);
         if self.focus.is_none() && self.focusable(i) && !self.quiet {
             self.focus = Some(i);
         }
@@ -183,7 +186,23 @@ impl<A: Copy + PartialEq> Form<A> {
 
     /// Whether control `i` is on the page shown.
     fn shown(&self, i: usize) -> bool {
-        self.pages[i].is_none_or(|p| p == self.page)
+        !self.hidden[i] && self.pages[i].is_none_or(|p| p == self.page)
+    }
+
+    /// Puts control `i` away (or back): it is neither drawn nor clicked.
+    pub fn set_hidden(&mut self, i: usize, hide: bool) {
+        self.hidden[i] = hide;
+        if hide && self.focus == Some(i) {
+            self.focus = None;
+        }
+        if hide && self.open == Some(i) {
+            self.open = None;
+        }
+    }
+
+    /// Moves control `i` to `rect`.
+    pub fn set_rect(&mut self, i: usize, rect: Rect) {
+        self.controls[i].0 = rect;
     }
 
     /// A text field or list on the page shown.
@@ -372,7 +391,10 @@ impl<A: Copy + PartialEq> Form<A> {
             Widget::Choice { options, .. } => options.len() as i32,
             _ => 0,
         };
-        Rect::new(r.x, r.y + r.h, r.w, n * ROW_H + 4)
+        let h = n * ROW_H + 4;
+        // Under it, or over it when the form ends before the options do.
+        let y = if r.y + r.h + h > self.h && r.y - h >= 0 { r.y - h } else { r.y + r.h };
+        Rect::new(r.x, y, r.w, h)
     }
 
     /// A press while a drop-down is open: it picks the option under the
