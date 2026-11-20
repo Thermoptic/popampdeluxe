@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- The REM button of the playlist window (classic skins): its first menu item, the
+  one over the button that a click chooses, is now ALL (remove all) and MISC
+  has the last place. They changed places.
 - The skin's title bar of the windows the player opens has no text: the bar is
   empty, like the Media Library's.
 - The row of buttons at the bottom of the Media Library window (Play, Enqueue,

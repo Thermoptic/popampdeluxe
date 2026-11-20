@@ -1200,6 +1200,17 @@ mod tests {
     }
 
     #[test]
+    fn a_click_on_rem_removes_all_and_misc_is_the_last_item() {
+        let (mut m, mut w) = playlist(3);
+        m.settings_mut().pl_single_click = true;
+        // REM at (43, 86): the item over the button is REM ALL.
+        w.mouse_down(&mut m, &input(50, 100));
+        assert!(w.popup_open());
+        w.mouse_up(&mut m, &input(50, 100));
+        assert_eq!(m.playlist.len(), 0, "a click on REM clears the playlist");
+    }
+
+    #[test]
     fn resizing_snaps_to_the_layout_steps() {
         let (mut m, _) = playlist(0);
         assert!(crate::bind::resize(&mut m, WindowKey::Playlist, (275, 116), 30, 10));

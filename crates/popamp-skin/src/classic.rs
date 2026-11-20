@@ -611,7 +611,8 @@ fn playlist_menus() -> Vec<Element> {
     let act = Action::click;
     let actions: [&[Action]; 5] = [
         &[act(K::PlAddFiles), act(K::PlAddFolder), act(K::PlAddUrl)],
-        &[Action::MenuOnRelease(MenuRef::PlaylistRemoveMisc), act(K::PlRemoveSelected), act(K::PlCropSelected), act(K::ClearPlaylist)],
+        // The first, over the button, is what a click does: REM ALL. MISC is the last.
+        &[act(K::ClearPlaylist), act(K::PlRemoveSelected), act(K::PlCropSelected), Action::MenuOnRelease(MenuRef::PlaylistRemoveMisc)],
         &[act(K::SelectAll), act(K::SelectNone), act(K::InvertSelection)],
         &[Action::MenuOnRelease(MenuRef::PlaylistMisc), act(K::FileInfo), Action::MenuOnRelease(MenuRef::PlaylistSort)],
         &[act(K::PlaylistOpen), act(K::PlaylistSave), act(K::ClearPlaylist)],

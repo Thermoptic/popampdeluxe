@@ -317,11 +317,12 @@ pub mod pl {
     pub fn menu_items(menu: usize) -> &'static [(Rect, Rect)] {
         const ADD: [(Rect, Rect); 3] =
             [(r(0, 149, 22, 18), r(23, 149, 22, 18)), (r(0, 130, 22, 18), r(23, 130, 22, 18)), (r(0, 111, 22, 18), r(23, 111, 22, 18))];
+        // REM ALL is the first, over the button: what a click does. REM MISC is the last.
         const REM: [(Rect, Rect); 4] = [
-            (r(54, 168, 22, 18), r(77, 168, 22, 18)),
+            (r(54, 111, 22, 18), r(77, 111, 22, 18)),
             (r(54, 149, 22, 18), r(77, 149, 22, 18)),
             (r(54, 130, 22, 18), r(77, 130, 22, 18)),
-            (r(54, 111, 22, 18), r(77, 111, 22, 18)),
+            (r(54, 168, 22, 18), r(77, 168, 22, 18)),
         ];
         const SEL: [(Rect, Rect); 3] = [
             (r(104, 149, 22, 18), r(127, 149, 22, 18)),

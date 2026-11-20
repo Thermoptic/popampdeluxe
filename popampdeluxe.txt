@@ -21,6 +21,16 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-20   REM: ALL FIRST, MISC LAST
+  ..........................................................................
+
+  In the Playlist window, the first item in the menu of the REM button (the
+  one that sits over the button, and that a click chooses) is now ALL, which
+  removes every song. MISC, which opens the menu of the other ways to
+  remove songs, has the last place. They changed places. (Skins with
+  classic pictures.)
+
+
   2026-11-20   SINGLE-CLICK PLAYLIST BUTTONS
   ..........................................................................
 
