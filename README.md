@@ -30,6 +30,9 @@ download: [popampdeluxe.txt](popampdeluxe.txt).*
   previous or next track, pause, stop, shuffle, repeat, volume up or down.
   Middle-click the equalizer to pause, or hover its title bar and scroll
   to change the volume, with no click needed.
+
+<p align="center"><img src="assets/screenshots/shortcuts.png" alt="Preferences, Shortcuts page"></p>
+
 - **A skin comes with the player.** Winamp Classic Amber is the skin a new
   install starts with, in a `skins` folder with the program.
 - **A `skins` folder beside the program.** Drop any `.wsz` in it and it
