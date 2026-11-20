@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- The row of buttons at the bottom of the Media Library window (Play, Enqueue,
+  Rescan, Add folder) is gone, in both kinds of library. The same choices are in
+  the right-click menu and the LIST button's menu. The state line ("190 items")
+  stays.
 - Every window the player opens (Preferences, Skin Browser, File info, the Folder
   and Group Editor, History, Jump to file and the rest) has the skin's own title
   bar, not the system's. Dialogs of the operating system, such as the file

@@ -22,15 +22,6 @@ use popamp_skin::{PlColors, Rect};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-/// The buttons under the lists. Rescan reads the folder on screen again;
-/// Add folder, at the right of it, adds a folder to the left list.
-pub const BUTTONS: [(&str, Command); 4] = [
-    ("Play", Command::LibraryPlay),
-    ("Enqueue", Command::LibraryEnqueue),
-    ("Rescan", Command::LibraryRescan),
-    ("Add folder", Command::LibraryAddFolder),
-];
-
 /// What the right list is ordered by.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SortBy {
@@ -138,7 +129,6 @@ pub struct FolderTree {
     /// First visible row of the roots and of the entries.
     scroll: [usize; 2],
     focus: Option<List>,
-    pressed: Option<usize>,
     dragging: Option<(List, i32)>,
     carry: Option<Carry>,
     /// The folder on screen could not be read.
@@ -215,6 +205,7 @@ impl FolderTree {
     }
 
     /// The paths of the folders, in order.
+    #[cfg(test)]
     pub fn folders(&self) -> Vec<&str> {
         self.items
             .iter()
@@ -314,6 +305,7 @@ impl FolderTree {
     }
 
     /// The folder on screen: the picked folder, or one inside it.
+    #[cfg(test)]
     pub fn current(&self) -> Option<&Path> {
         self.dir.as_deref()
     }
@@ -561,15 +553,6 @@ impl FolderTree {
             }
         }
 
-        for (i, (name, _)) in BUTTONS.iter().enumerate() {
-            let k = p.buttons[i];
-            let face = rect(k.x, k.y + 2, k.w, k.h - 2);
-            pen.b.fill(face.x, face.y, face.w, face.h, if self.pressed == Some(i) { c.selected_bg } else { line });
-            if self.pressed != Some(i) {
-                pen.b.fill(face.x + 1, face.y + 1, face.w - 2, face.h - 2, c.normal_bg);
-            }
-            pen.centre(face, name, c.normal);
-        }
         if p.status.w >= px * 4 {
             pen.right(rect(p.status.x, p.status.y + 2, p.status.w, p.status.h - 2), &self.status(), dim);
         }
@@ -693,10 +676,6 @@ impl FolderTree {
     pub fn press(&mut self, at: Place, x: i32, y: i32, shift: bool, ctrl: bool, double: bool) -> Reaction {
         self.carry = None;
         let p = Parts::new(at, false);
-        if let Some(i) = p.buttons.iter().position(|k| k.contains(x, y)) {
-            self.pressed = Some(i);
-            return Reaction { capture: true, run: None };
-        }
         if let Some(list) = [List::Views, List::Tracks].into_iter().find(|&l| p.bar(l).is_some_and(|b| b.contains(x, y))) {
             let Some(t) = self.thumb(&p, list) else { return Reaction::default() };
             let grab = if y >= t.y && y < t.y + t.h { y - t.y } else { t.h / 2 };
@@ -788,13 +767,12 @@ impl FolderTree {
         moving
     }
 
-    pub fn release(&mut self, at: Place, x: i32, y: i32) -> Option<Command> {
+    pub fn release(&mut self, _at: Place, _x: i32, _y: i32) -> Option<Command> {
         self.dragging = None;
         if let Some(Carry::Pressed { row, .. }) = self.carry.take() {
             self.select_only(row);
         }
-        let i = self.pressed.take()?;
-        Parts::new(at, false).buttons[i].contains(x, y).then_some(BUTTONS[i].1)
+        None
     }
 
     pub fn wheel(&mut self, at: Place, x: i32, y: i32, steps: i32) {
@@ -1105,23 +1083,6 @@ y.ogg
         assert_eq!(names(&t), ["Live", "b"]);
         t.remove_root();
         assert!(t.items.is_empty() && t.entries.is_empty() && t.folder().is_none());
-        let _ = std::fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn the_buttons_run_their_commands_and_add_folder_is_right_of_rescan() {
-        assert_eq!(
-            BUTTONS.map(|b| b.1),
-            [Command::LibraryPlay, Command::LibraryEnqueue, Command::LibraryRescan, Command::LibraryAddFolder]
-        );
-        let (root, mut t) = music("buttons");
-        let p = Parts::new(AT, false);
-        let add = p.buttons[3];
-        assert!(add.x > p.buttons[2].x, "to the right of Rescan");
-        let (x, y) = (add.x + 3, add.y + 3);
-        assert!(t.press(AT, x, y, false, false, false).capture);
-        assert_eq!(t.release(AT, x, y), Some(Command::LibraryAddFolder));
-        assert_eq!(t.release(AT, 0, 0), None);
         let _ = std::fs::remove_dir_all(root);
     }
 

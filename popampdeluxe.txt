@@ -208,17 +208,20 @@
 
   How to use it
 
-     * Press "Add folder" (at the right of "Rescan") and choose a folder.
-       It appears in the left column. Right-click it to remove it again.
+     * Right-click in the window (or press the LIST button) and choose "Add
+       folder..." to pick a folder. It appears in the left column.
+       Right-click it and choose the entry that removes it again.
      * Click a folder on the left to see its contents on the right.
      * Double-click a folder on the right to open it. ".." at the top, or
        Backspace, goes back up.
      * Double-click a song to play it, or to add it to the playlist (as in
        Preferences > Media Library: "Enter and double-click enqueue").
-       Play and Enqueue work on what you have selected, a whole folder too.
+       "Play" and "Enqueue" in the right-click menu work on what you have
+       selected, a whole folder too.
      * Press "Title" to sort A to Z, press again for Z to A. Press "Date
        modified" for the newest first, and again for the oldest first.
-     * "Rescan" reads the folder again, if files were added meanwhile.
+     * "Rescan folders" in the right-click menu reads the folder again, if
+       files were added meanwhile.
 
   The list of added folders is kept in foldertree.txt, next to the settings.
 

@@ -162,6 +162,7 @@ pub struct Binding {
     /// How it is kept in the ini file.
     pub id: &'static str,
     /// The heading it is listed under.
+    #[allow(dead_code)]
     pub group: &'static str,
     pub label: &'static str,
     pub scope: Scope,
