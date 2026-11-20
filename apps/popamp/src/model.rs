@@ -1470,6 +1470,25 @@ impl Model {
                 self.settings_mut().ml_ws = v;
                 self.ui.push(UiReq::Layout);
             }
+            C::ToggleAllShades => {
+                // The open windows go in or out together, as most of them are not.
+                let s = self.settings();
+                let wins = [
+                    (true, s.windowshade, C::ToggleWindowshade),
+                    (s.eq_open, s.eq_ws, C::ToggleEqShade),
+                    (s.pe_open, s.pe_ws, C::TogglePlShade),
+                    (s.ml_open, s.ml_ws, C::ToggleLibraryShade),
+                ];
+                let open: Vec<_> = wins.into_iter().filter(|w| w.0).collect();
+                let shaded = open.iter().filter(|w| w.1).count();
+                // More shaded than not: all come out; else (a tie too) all go in.
+                let shade = shaded * 2 <= open.len();
+                for (_, is_shaded, toggle) in open {
+                    if is_shaded != shade {
+                        self.exec(toggle);
+                    }
+                }
+            }
             C::ToggleEqWindow => {
                 let v = !self.settings().eq_open;
                 self.settings_mut().eq_open = v;
@@ -2059,6 +2078,39 @@ mod tests {
         let item = m.options_menu().into_iter().find(|i| i.label == "Preferences…").expect("in the menu");
         m.on_menu(item.action.expect("does something"));
         assert!(m.ui.iter().any(|r| matches!(r, UiReq::Panel(PanelKind::Preferences))));
+    }
+
+    #[test]
+    fn winshade_all_follows_the_majority_and_a_tie_shades() {
+        let mut m = Model::for_tests();
+        let state = |m: &Model| {
+            let s = m.settings();
+            [s.windowshade, s.eq_ws, s.pe_ws, s.ml_ws]
+        };
+        m.settings_mut().eq_open = true;
+        m.settings_mut().pe_open = true;
+        m.settings_mut().ml_open = false;
+        // Three windows open, none shaded: all go in.
+        m.exec(Command::ToggleAllShades);
+        assert_eq!(state(&m), [true, true, true, false], "the closed library is left alone");
+        // Again: all are shaded, so all come out.
+        m.exec(Command::ToggleAllShades);
+        assert_eq!(state(&m), [false; 4]);
+        // Two shaded, one out: the majority is shaded, so all come out.
+        m.settings_mut().windowshade = true;
+        m.settings_mut().eq_ws = true;
+        m.exec(Command::ToggleAllShades);
+        assert_eq!(state(&m), [false; 4]);
+        // One shaded, two out: the majority is out, so all go in.
+        m.settings_mut().windowshade = true;
+        m.exec(Command::ToggleAllShades);
+        assert_eq!(state(&m), [true, true, true, false]);
+        // A tie (four open, two shaded): shading wins.
+        m.settings_mut().ml_open = true;
+        m.settings_mut().ml_ws = false;
+        m.settings_mut().pe_ws = false;
+        m.exec(Command::ToggleAllShades);
+        assert_eq!(state(&m), [true; 4]);
     }
 
     #[test]

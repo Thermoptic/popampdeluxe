@@ -21,6 +21,25 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-20   WINSHADE AND WINSHADE ALL
+  ..........................................................................
+
+  Preferences > Shortcuts, in the right-hand list (the action):
+
+     Winshade       Shades or unshades the window whose title bar you
+                    clicked, as the shade button of that window does.
+     Winshade All   Shades all the open windows at once. Do it again and
+                    they come out again.
+
+  Winshade All goes by the majority of the open windows. If most are
+  shaded it unshades them all; if most are out it shades them all. With as
+  many shaded as out, shading wins and all windows are shaded. Example:
+  three shaded and one out: all come out.
+
+  The same is in Preferences > Hotkeys as "Windowshade all windows", with no
+  keys until you give it some.
+
+
   2026-11-20   REM: ALL FIRST, MISC LAST
   ..........................................................................
 

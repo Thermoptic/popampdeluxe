@@ -34,7 +34,7 @@ pub const CLICKS: [(Click, &str, &str); 4] = [
 ];
 
 /// What a click can do.
-pub const ACTIONS: [(Command, &str, &str); 8] = [
+pub const ACTIONS: [(Command, &str, &str); 10] = [
     (Command::Previous, "previous", "Previous track"),
     (Command::Next, "next", "Next track"),
     (Command::Pause, "pause", "Pause"),
@@ -43,7 +43,22 @@ pub const ACTIONS: [(Command, &str, &str); 8] = [
     (Command::ToggleRepeat, "repeat", "Repeat on/off"),
     (Command::VolumeUp, "volup", "Vol Up"),
     (Command::VolumeDown, "voldown", "Vol Down"),
+    // Shades or unshades the window clicked on, as its own shade button does.
+    (Command::ToggleWindowshade, "winshade", "Winshade"),
+    // Shades all the windows, or unshades them when most are shaded.
+    (Command::ToggleAllShades, "winshadeall", "Winshade All"),
 ];
+
+/// The command that shades or unshades `window`: what the Winshade action
+/// runs for a click on its title bar.
+pub fn shade_command(window: WindowKey) -> Command {
+    match window {
+        WindowKey::Eq => Command::ToggleEqShade,
+        WindowKey::Playlist => Command::TogglePlShade,
+        WindowKey::Library => Command::ToggleLibraryShade,
+        _ => Command::ToggleWindowshade,
+    }
+}
 
 /// One rule: a click on a window's title bar runs a command.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,6 +106,16 @@ pub fn find(spec: &str, window: WindowKey, click: Click) -> Option<Command> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn winshade_is_the_clicked_windows_own_and_winshade_all_is_for_all() {
+        assert_eq!(shade_command(WindowKey::Main), Command::ToggleWindowshade);
+        assert_eq!(shade_command(WindowKey::Eq), Command::ToggleEqShade);
+        assert_eq!(shade_command(WindowKey::Playlist), Command::TogglePlShade);
+        let spec = "eq:middle:winshade;main:right:winshadeall";
+        assert_eq!(find(spec, WindowKey::Eq, Click::Middle), Some(Command::ToggleWindowshade), "the action; the window decides which shade");
+        assert_eq!(find(spec, WindowKey::Main, Click::Right), Some(Command::ToggleAllShades));
+    }
 
     #[test]
     fn a_rule_is_found_by_window_and_button() {

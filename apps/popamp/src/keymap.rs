@@ -223,6 +223,7 @@ pub const BINDINGS: &[Binding] = &[
     b("win_eq", "Windows", "Equalizer window", Global, C::ToggleEqWindow, &["Alt+G"]),
     b("win_library", "Windows", "Media Library window", Global, C::ToggleLibraryWindow, &["Alt+L"]),
     b("minimize", "Windows", "Minimize", Global, C::Minimize, &["Alt+M"]),
+    b("shade_all", "Windows", "Windowshade all windows", Global, C::ToggleAllShades, &[]),
     b("pl_up", "Playlist window", "Move selection up", Playlist, C::MoveSelectionUp, &["Alt+Up"]),
     b("pl_down", "Playlist window", "Move selection down", Playlist, C::MoveSelectionDown, &["Alt+Down"]),
     b("pl_play", "Playlist window", "Play selected", Playlist, C::PlaySelected, &["Enter", "NumEnter"]),

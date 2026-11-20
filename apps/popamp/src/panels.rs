@@ -867,7 +867,7 @@ impl Preferences {
                         shortcut_rows.push(row);
                     }
                     // Room for the options of the last row to open.
-                    y += SHORTCUT_ROWS as i32 * 30 + 130;
+                    y += SHORTCUT_ROWS as i32 * 30 + 200;
                 }
                 Section::Hotkeys => {
                     let list = Widget::List { rows: vec![], selected: None, scroll: 0 };

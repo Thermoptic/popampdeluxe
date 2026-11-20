@@ -128,6 +128,7 @@ commands! {
     ToggleLibraryShade = 50042,
     PlCopyToClipboard = 50043,
     LibraryEditFolders = 50044,
+    ToggleAllShades = 50045,
 }
 
 #[cfg(test)]

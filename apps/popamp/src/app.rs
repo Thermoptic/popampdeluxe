@@ -1507,8 +1507,15 @@ impl App {
         if !self.skins[k.index()].on_title(&self.model, at.x, at.y) {
             return false;
         }
-        for _ in 0..times {
+        if command == Command::ToggleWindowshade {
+            // Winshade: the shade of the window clicked on, once whatever the wheel did.
+            self.model.exec(shortcuts::shade_command(k));
+        } else if command == Command::ToggleAllShades {
             self.model.exec(command);
+        } else {
+            for _ in 0..times {
+                self.model.exec(command);
+            }
         }
         self.after_model(el);
         self.redraw_all();

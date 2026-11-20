@@ -37,6 +37,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Winshade** and **Winshade All** in Preferences > Shortcuts (the right-hand list
+  of actions). *Winshade* shades or unshades the window whose title bar was clicked,
+  as its own shade button does, so any click or wheel turn can do it.
+  *Winshade All* shades all the open windows at once; done again, it unshades them.
+  It goes by the majority: when most of the open windows are shaded it unshades them
+  all, else (a tie too) it shades them all. Also a command with no keys at the start,
+  *Windowshade all windows* in Preferences > Hotkeys.
 - **Single-click playlist buttons** (Preferences > Playlist): off by default. When
   ticked, the picture buttons ADD, REM, SEL, MISC and LIST (and the library's
   LIST) work in one go: press and hold on a button and its menu folds out with
