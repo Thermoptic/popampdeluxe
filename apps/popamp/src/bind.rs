@@ -18,7 +18,8 @@ pub fn flag(model: &Model, f: Flag) -> bool {
         Flag::Playing => state == PlayState::Playing,
         Flag::Paused => state == PlayState::Paused,
         Flag::Stopped => !running,
-        Flag::Seekable => running && sh.length_ms().is_some_and(|l| l > 0),
+        // Not in the title bar of a dialog, which has no timeline.
+        Flag::Seekable => running && !model.dialog_bar && sh.length_ms().is_some_and(|l| l > 0),
         Flag::Stereo => running && sh.channels() >= 2,
         Flag::Mono => running && sh.channels() < 2,
         Flag::Shuffle => s.shuffle,
@@ -30,6 +31,7 @@ pub fn flag(model: &Model, f: Flag) -> bool {
         Flag::DoubleSize => s.dsize,
         Flag::EqOn => s.use_eq,
         Flag::EqAutoload => s.autoload_eq,
+        Flag::DialogBar => model.dialog_bar,
     }
 }
 
@@ -285,6 +287,14 @@ pub fn window_size(model: &Model, key: WindowKey) -> (i32, i32) {
 mod tests {
     use super::*;
     use popamp_core::config::BarEdge;
+
+    #[test]
+    fn a_dialogs_title_bar_has_no_timeline() {
+        let mut m = Model::for_tests();
+        assert!(!flag(&m, Flag::DialogBar));
+        m.dialog_bar = true;
+        assert!(flag(&m, Flag::DialogBar) && !flag(&m, Flag::Seekable));
+    }
 
     #[test]
     fn sizes_come_from_the_layout_and_settings() {

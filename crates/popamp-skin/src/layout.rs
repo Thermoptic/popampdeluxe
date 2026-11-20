@@ -246,6 +246,9 @@ pub enum Pos {
     Start(i32),
     Center(i32),
     End(i32),
+    /// A share of the length, in thousandths, and an offset from there: it
+    /// grows and shrinks with the window.
+    Share(i32, i32),
 }
 
 impl Pos {
@@ -254,6 +257,7 @@ impl Pos {
             Pos::Start(o) => o,
             Pos::Center(o) => len / 2 + o,
             Pos::End(o) => len + o,
+            Pos::Share(part, o) => len * part / 1000 + o,
         }
     }
 }
@@ -541,6 +545,9 @@ pub enum Flag {
     DoubleSize,
     EqOn,
     EqAutoload,
+    /// A window's title bar is being drawn for a dialog, which has nothing
+    /// in it but its lines and buttons.
+    DialogBar,
 }
 
 /// A number the player shows and lets the user change.

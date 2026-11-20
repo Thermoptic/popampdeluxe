@@ -433,6 +433,7 @@ fn shift(p: Pos, by: i32) -> Pos {
         Start(o) => Start(o + by),
         Center(o) => Center(o + by),
         End(o) => End(o + by),
+        Pos::Share(part, o) => Pos::Share(part, o + by),
     }
 }
 
@@ -595,6 +596,38 @@ pub(crate) fn library_shade() -> Mode {
         button(span(End(-11), Start(3), End(-2), Start(12)), pl_overlay(p::CLOSE_PRESSED), Action::click(close)).cursor(C::PClose),
         button(span(End(-20), Start(3), End(-11), Start(12)), pl_overlay(p::SHADE_PRESSED), Action::click(shade)).cursor(C::PWinBut),
     ];
+    let mut v = v;
+    // The timeline of the song, in the middle half of the bar: a dark box
+    // over the lines, with a thumb in it that shows how far the song has
+    // got (left: at the start, middle: half way). Not in a dialog's bar.
+    let (from, to) = (Pos::Share(260, 0), Pos::Share(740, 0));
+    v.push(
+        Element::new(
+            span(from, Start(4), to, Start(11)),
+            Kind::Image { look: Look::plain(paint(Sheet::PlEdit, Rect { x: 76, y: 46, w: 20, h: 7 })), fill: Fill::Tile, lit: None },
+        )
+        .show(Cond::Unless(Flag::DialogBar)),
+    );
+    let t = Sheet::TitleBar;
+    v.push(
+        Element::new(
+            span(from, Start(4), to, Start(11)),
+            Kind::Slider(Slider {
+                value: Value::Position,
+                vertical: false,
+                track: None,
+                thumb: Look::plain(paint(t, m::SHADE_POS_THUMB)),
+                thumb_len: m::SHADE_POS_THUMB.w,
+                live: false,
+                reset: None,
+                wheel: 0,
+                detent: 0,
+                thumb_thirds: None,
+            }),
+        )
+        .show(Cond::If(Flag::Seekable))
+        .cursor(C::WSPosBar),
+    );
     Mode { width: Dim::Free { min: p::MIN_SIZE.0, step: p::STEP.0 }, height: Dim::Fixed(14), cursor: C::PWSNorm, elements: v, shape: None }
 }
 
@@ -755,6 +788,18 @@ mod tests {
         assert!(matches!(hit(&def.normal, nw, nh, 100, 5).unwrap().kind, Kind::Drag { double: Some(Command::ToggleLibraryShade) }));
         let button = hit(&def.normal, nw, nh, nw - 16, 7).unwrap();
         assert!(matches!(button.kind, Kind::Button { action: Action::Click { plain: Command::ToggleLibraryShade, .. }, .. }));
+    }
+
+    #[test]
+    fn the_shaded_library_has_a_timeline_in_its_middle_that_follows_the_window() {
+        let l = layout(433, 433);
+        let shade = l.window(WindowKey::Library).unwrap().shade.as_ref().unwrap();
+        let slider = shade.elements.iter().find(|e| matches!(e.kind, Kind::Slider(Slider { value: Value::Position, .. }))).expect("a timeline");
+        for w in [275, 550, 1000] {
+            let r = slider.at.resolve(w, 14);
+            assert_eq!((r.x, r.x + r.w), (w * 26 / 100, w * 74 / 100), "the middle half of a bar {w} wide");
+            assert_eq!((r.y, r.h), (4, 7));
+        }
     }
 
     #[test]

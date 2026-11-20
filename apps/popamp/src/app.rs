@@ -883,7 +883,10 @@ impl App {
         let mut bar = Bitmap::new(crate::pen::screen(pct, w), crate::pen::screen(pct, h), 0);
         if h > 0 {
             let scale = Scale::new(pct, popamp_core::config::Scaling::Sharp);
+            // A dialog's bar has no timeline of the song.
+            self.model.dialog_bar = true;
             SkinWin::new(WindowKey::Library).draw(&self.model, &mut self.fonts, &mut Canvas::new(&mut bar, scale), true);
+            self.model.dialog_bar = false;
         }
         self.model.settings_mut().ml_ws = shaded;
         self.model.settings_mut().ml_width = width;
