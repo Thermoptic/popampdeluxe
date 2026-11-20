@@ -577,25 +577,25 @@ fn library_window() -> WindowDef {
 
 /// The library's windowshade strip, which a skin that draws the library
 /// window itself and gives it none gets: the top of the library window as
-/// it is when open, the playlist's title bar without its title, so that it
-/// has the colours of the other windows (the strip of the playlist's own
-/// shade is another picture, and some skins draw it in other colours). It
-/// says nothing: no title. Preferences takes it for its title bar too.
+/// it is when open, the playlist's title bar without its title, cut to the
+/// 14 pixels of the other windows' shade strips. It has the lines and
+/// the colours of the skin's title bars (the picture of the playlist's own
+/// shade strip is another, which some skins draw in other colours). It says
+/// nothing: no title. Preferences takes it for its title bar too.
 pub(crate) fn library_shade() -> Mode {
     let close = Command::ToggleLibraryWindow;
     let shade = Command::ToggleLibraryShade;
+    // The top rows of the title bar's pictures, 14 of their 20.
+    let cut = |(on, off): (Rect, Rect)| pair_look((Rect { h: 14, ..on }, Rect { h: 14, ..off }));
     let v = vec![
-        piece(Start(0), Start(0), pair_look(p::TOP_LEFT), 25, 20),
-        Element::new(
-            span(Start(25), Start(0), End(-25), Start(20)),
-            Kind::Image { look: pair_look(p::TOP_TILE), fill: Fill::Tile, lit: None },
-        ),
-        piece(End(-25), Start(0), pair_look(p::TOP_RIGHT), 25, 20),
-        Element::new(span(Start(0), Start(0), End(0), Start(20)), Kind::Drag { double: Some(shade) }).cursor(C::PTBar),
+        piece(Start(0), Start(0), cut(p::TOP_LEFT), 25, 14),
+        Element::new(span(Start(25), Start(0), End(-25), Start(14)), Kind::Image { look: cut(p::TOP_TILE), fill: Fill::Tile, lit: None }),
+        piece(End(-25), Start(0), cut(p::TOP_RIGHT), 25, 14),
+        Element::new(span(Start(0), Start(0), End(0), Start(14)), Kind::Drag { double: Some(shade) }).cursor(C::PTBar),
         button(span(End(-11), Start(3), End(-2), Start(12)), pl_overlay(p::CLOSE_PRESSED), Action::click(close)).cursor(C::PClose),
         button(span(End(-20), Start(3), End(-11), Start(12)), pl_overlay(p::SHADE_PRESSED), Action::click(shade)).cursor(C::PWinBut),
     ];
-    Mode { width: Dim::Free { min: p::MIN_SIZE.0, step: p::STEP.0 }, height: Dim::Fixed(20), cursor: C::PWSNorm, elements: v, shape: None }
+    Mode { width: Dim::Free { min: p::MIN_SIZE.0, step: p::STEP.0 }, height: Dim::Fixed(14), cursor: C::PWSNorm, elements: v, shape: None }
 }
 
 /// The small transport buttons drawn in the playlist frame's bottom right.
@@ -739,15 +739,15 @@ mod tests {
         let l = layout(433, 433);
         let def = l.window(WindowKey::Library).unwrap();
         let shade = &def.shade.as_ref().expect("a shaded look");
-        assert!(matches!(shade.height, Dim::Fixed(20)), "the top of the window");
+        assert!(matches!(shade.height, Dim::Fixed(14)));
         let w = 450;
         for (x, y) in [(100, 5), (w - 30, 5)] {
-            let drag = hit(shade, w, 20, x, y).unwrap();
+            let drag = hit(shade, w, 14, x, y).unwrap();
             assert!(matches!(drag.kind, Kind::Drag { double: Some(Command::ToggleLibraryShade) }), "a double click on the bar unshades");
         }
-        let unshade = hit(shade, w, 20, w - 16, 7).unwrap();
+        let unshade = hit(shade, w, 14, w - 16, 7).unwrap();
         assert!(matches!(unshade.kind, Kind::Button { action: Action::Click { plain: Command::ToggleLibraryShade, .. }, .. }));
-        let close = hit(shade, w, 20, w - 6, 7).unwrap();
+        let close = hit(shade, w, 14, w - 6, 7).unwrap();
         assert!(matches!(close.kind, Kind::Button { action: Action::Click { plain: Command::ToggleLibraryWindow, .. }, .. }));
         // Full size: a double click on the title bar shades, and so does the button.
         let (nw, nh) = (450, 348);
