@@ -739,15 +739,15 @@ mod tests {
         let l = layout(433, 433);
         let def = l.window(WindowKey::Library).unwrap();
         let shade = &def.shade.as_ref().expect("a shaded look");
-        assert!(matches!(shade.height, Dim::Fixed(14)));
+        assert!(matches!(shade.height, Dim::Fixed(20)), "the top of the window");
         let w = 450;
         for (x, y) in [(100, 5), (w - 30, 5)] {
-            let drag = hit(shade, w, 14, x, y).unwrap();
+            let drag = hit(shade, w, 20, x, y).unwrap();
             assert!(matches!(drag.kind, Kind::Drag { double: Some(Command::ToggleLibraryShade) }), "a double click on the bar unshades");
         }
-        let unshade = hit(shade, w, 14, w - 16, 7).unwrap();
+        let unshade = hit(shade, w, 20, w - 16, 7).unwrap();
         assert!(matches!(unshade.kind, Kind::Button { action: Action::Click { plain: Command::ToggleLibraryShade, .. }, .. }));
-        let close = hit(shade, w, 14, w - 6, 7).unwrap();
+        let close = hit(shade, w, 20, w - 6, 7).unwrap();
         assert!(matches!(close.kind, Kind::Button { action: Action::Click { plain: Command::ToggleLibraryWindow, .. }, .. }));
         // Full size: a double click on the title bar shades, and so does the button.
         let (nw, nh) = (450, 348);
