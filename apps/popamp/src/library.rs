@@ -162,7 +162,6 @@ pub(crate) struct Parts {
     /// The artists and the albums, when the view has them.
     pub(crate) panes: Option<[Table; 2]>,
     pub(crate) table: Table,
-    pub(crate) status: Rect,
     pub(crate) row_h: i32,
     /// The width of each list's scroll bar, right of its rows, and the
     /// length of the skin's thumb.
@@ -182,8 +181,8 @@ impl Parts {
         let Place { r, px, gap, .. } = at;
         let bar_w = at.thumb.map_or(OWN_BAR, |t| t.0);
         let row_h = px + gap;
-        let bar_h = row_h + 4;
-        let body_h = (r.h - bar_h - 2).max(0);
+        // The lists go down to the frame: the state is in the skin's small display.
+        let body_h = r.h.max(0);
         let views_w = (r.w * 3 / 10).clamp(60, 120).min(r.w);
         let (x, w) = (r.x + views_w + 3, (r.w - views_w - 3).max(0));
         let search_h = row_h + 3;
@@ -195,13 +194,11 @@ impl Parts {
         let panes_h = if panes { list_h * 2 / 5 } else { 0 };
         let half = ((w - 3) / 2).max(0);
         let ty = list_y + if panes { panes_h + 3 } else { 0 };
-        let by = r.y + r.h - bar_h;
         Parts {
             views: rect(r.x, r.y, (views_w - bar_w).max(0), body_h),
             search: rect(x, r.y, w, search_h),
             panes: panes.then(|| [table(x, list_y, half, panes_h), table(x + half + 3, list_y, (w - half - 3).max(0), panes_h)]),
             table: table(x, ty, w, list_y + list_h - ty),
-            status: rect(r.x, by, r.w, bar_h),
             row_h,
             bar_w,
             thumb_h: at.thumb.map(|t| t.1),
@@ -625,10 +622,6 @@ impl LibraryPane {
         self.draw_table(&mut pen, &p, c, active, playing);
         for list in LISTS {
             self.draw_bar(&mut pen, &p, list, c, at.thumb.is_none());
-        }
-
-        if p.status.w >= px * 4 {
-            pen.right(rect(p.status.x, p.status.y + 2, p.status.w, p.status.h - 2), &self.status(), dim);
         }
     }
 
@@ -1290,7 +1283,7 @@ mod tests {
         let bar = |list| p.bar(list).map(|b| b.x + b.w);
         assert_eq!((bar(List::Albums), bar(List::Tracks)), (Some(R.w), Some(R.w)));
         assert!(bar(List::Views).unwrap() < p.search.x && bar(List::Artists).unwrap() < albums.rows.x);
-        assert!(p.table.rows.y + p.table.rows.h < p.status.y, "the lists end above the line of the status");
+        assert_eq!(p.table.rows.y + p.table.rows.h, R.h, "the lists go down to the frame");
         assert_eq!(Parts::new(AT, false).table.header.y, artists.header.y, "without the panes the table takes their room");
         let small = Parts::new(Place { r: rect(0, 0, 20, 10), ..AT }, true);
         assert!(small.table.rows.w >= 0 && small.table.rows.h >= 0 && small.views.h >= 0, "too small a window draws nothing wrong");

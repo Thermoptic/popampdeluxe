@@ -552,10 +552,6 @@ impl FolderTree {
                 pen.b.fill(t.x + 1, t.y, t.w - 2, t.h, if held { pen.dim } else { pen.line });
             }
         }
-
-        if p.status.w >= px * 4 {
-            pen.right(rect(p.status.x, p.status.y + 2, p.status.w, p.status.h - 2), &self.status(), dim);
-        }
     }
 
     fn draw_entries(&self, pen: &mut Pen, p: &Parts, c: &PlColors, active: bool, playing: Option<&str>) {
