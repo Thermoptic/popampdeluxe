@@ -21,7 +21,8 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - **Hotkeys** (Preferences > Hotkeys): every keyboard shortcut of the player is
-  listed and can be changed: pick one, press *Change* and then the new keys
+  listed, the names of the commands in a column at the left and their keys in
+  one at the right, and can be changed: pick one, press *Change* and then the new keys
   (Ctrl, Shift and Alt with a key), *Add* another key to it, *Clear* it or give
   it *Default* keys again; *All default* resets them all. Keys another
   shortcut had in the same window are taken from it. The menus show the keys

@@ -705,7 +705,8 @@ pub struct Preferences {
     capturing: Option<(usize, bool)>,
 }
 
-/// The rows of the list of shortcuts: what each does and its keys.
+/// The rows of the list of shortcuts: what each does, a tab (the list makes
+/// two columns of it) and its keys.
 pub fn hotkey_rows(keymap: &crate::keymap::Keymap) -> Vec<String> {
     use crate::keymap::{Scope, BINDINGS};
     BINDINGS
@@ -718,7 +719,7 @@ pub fn hotkey_rows(keymap: &crate::keymap::Keymap) -> Vec<String> {
                 Scope::Equalizer => "Equalizer: ",
             };
             let keys = keymap.text(i);
-            format!("{window}{}   [{}]", b.label, if keys.is_empty() { "none" } else { &keys })
+            format!("{window}{}\t{}", b.label, if keys.is_empty() { "(none)" } else { &keys })
         })
         .collect()
 }
@@ -1841,7 +1842,7 @@ pub(crate) mod tests {
         let list = pr.hotkey_list;
         let Widget::List { rows, .. } = pr.form.widget(list) else { panic!() };
         assert_eq!(rows.len(), BINDINGS.len(), "a row for each shortcut");
-        assert!(rows[1].starts_with("Play") && rows[1].contains("[X, Num5]"), "{}", rows[1]);
+        assert_eq!(rows[1], "Play\tX, Num5", "the name, a tab to the second column, the keys");
         // Pick Pause (the third row), press Change, then a key.
         let r = reach(&mut p, &mut m, list);
         click(&mut p, &mut m, Rect::new(r.x + 1, r.y + 2 * ROW_H + 2, 1, 1));
@@ -1854,7 +1855,7 @@ pub(crate) mod tests {
         assert!(!p.raw_key(K::KeyQ, (false, false, false), &mut m), "not waiting any more: the key is not used");
         let Panel::Prefs(pr) = &p else { unreachable!() };
         let Widget::List { rows, .. } = pr.form.widget(list) else { panic!() };
-        assert!(rows[pause].contains("[Ctrl+Y]"));
+        assert!(rows[pause].ends_with("\tCtrl+Y"));
         // Add another, taking one from another shortcut.
         push(&mut p, &mut m, Act::HotkeyAdd);
         assert!(p.raw_key(K::KeyX, (false, false, false), &mut m));

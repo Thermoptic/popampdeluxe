@@ -27,7 +27,9 @@
   Preferences > Hotkeys
 
   The list shows every keyboard shortcut of the player: playback, files,
-  windows, and the ones of the Playlist and Equalizer windows. To change one:
+  windows, and the ones of the Playlist and Equalizer windows. The names of
+  the commands are in the left column and their keys in the right. To
+  change one:
 
      1. Pick it in the list.
      2. Press "Change", then press the new keys (a key, with Ctrl, Shift

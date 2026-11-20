@@ -58,6 +58,7 @@ pub enum Widget<A> {
         text: String,
         cursor: usize,
     },
+    /// Rows of text; a tab in a row makes two columns of it.
     List {
         rows: Vec<String>,
         selected: Option<usize>,
@@ -723,8 +724,21 @@ fn draw_list(pen: &mut Pen, r: Rect, rows: &[String], selected: Option<usize>, s
         if sel {
             pen.fill(r.x + 2, y, r.w - 4, ROW_H, if focused { HILITE } else { mix(HILITE, FIELD_BG, 0.5) });
         }
-        let t = pen.fit(row, r.w - 12);
-        pen.text(r.x + 5, y + (ROW_H - FONT_PX as i32) / 2 - 1, &t, TEXT, r.x + 2, r.w - 4);
+        let ty = y + (ROW_H - FONT_PX as i32) / 2 - 1;
+        match row.split_once('\t') {
+            // A row with a tab has two columns: the second starts at 60 % of the width.
+            Some((left, right)) => {
+                let split = r.w * 6 / 10;
+                let t = pen.fit(left, split - 12);
+                pen.text(r.x + 5, ty, &t, TEXT, r.x + 2, split - 8);
+                let t = pen.fit(right, r.w - split - 12);
+                pen.text(r.x + split, ty, &t, TEXT, r.x + split, r.w - split - 4);
+            }
+            None => {
+                let t = pen.fit(row, r.w - 12);
+                pen.text(r.x + 5, ty, &t, TEXT, r.x + 2, r.w - 4);
+            }
+        }
     }
     // A thin bar on the right shows where the visible rows are.
     if rows.len() > page && page > 0 {
