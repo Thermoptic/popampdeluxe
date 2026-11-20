@@ -658,7 +658,7 @@ impl Preferences {
             let inside = match section {
                 Section::Shortcuts => 16 + SHORTCUT_ROWS as i32 * 30,
                 Section::Font => 62,
-                Section::Interface => 34,
+                Section::Interface => 28,
                 _ => 0,
             };
             form.add_on(page, Rect::new(x0, 10, cw, 22 + rows * 22 + inside), Widget::Group { label: section.label().into() });
@@ -671,10 +671,16 @@ impl Preferences {
             }
             let mut y = 40 + rows * 22;
             for &f in section.fields() {
-                form.add_on(page, Rect::new(x0 + 4, y, 136, 24), Widget::Label { text: f.label().into(), dim: false });
+                // A short number sits right after its label, inside the
+                // frame with the same room to the left as the other rows.
+                let (label, input) = match f {
+                    Field::RowGap => (Rect::new(x0 + 12, 17, 72, 24), Rect::new(x0 + 84, 17, 20, 24)),
+                    _ => (Rect::new(x0 + 4, y, 136, 24), Rect::new(x0 + 140, y, cw - 140, 24)),
+                };
+                form.add_on(page, label, Widget::Label { text: f.label().into(), dim: false });
                 let text = f.get(s);
                 let cursor = text.chars().count();
-                fields.push((f, form.add_on(page, Rect::new(x0 + 140, y, cw - 140, 24), Widget::Input { text, cursor })));
+                fields.push((f, form.add_on(page, input, Widget::Input { text, cursor })));
                 y += 30;
             }
             match section {
