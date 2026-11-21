@@ -846,7 +846,9 @@ impl FolderTree {
             Key::Enter => {
                 let cursor = self.cursor;
                 let single_folder = list == List::Tracks && self.entries.get(cursor).is_some_and(|e| e.dir);
-                if single_folder && !self.selected.iter().enumerate().any(|(i, &on)| on && i != cursor) {
+                // Shift+Enter on a folder does the other thing, with all it holds: it
+                // enqueues it (or plays it) instead of going in.
+                if single_folder && !shift && !self.selected.iter().enumerate().any(|(i, &on)| on && i != cursor) {
                     return (true, self.open(cursor).run);
                 }
                 return (true, Some(if shift { Command::LibraryOpenOther } else { Command::LibraryOpen }));
@@ -1191,6 +1193,10 @@ y.ogg
         let (root, mut t) = music("keys");
         assert_eq!(t.key(AT, Key::Down, false), (true, None));
         assert_eq!(t.key(AT, Key::Up, false), (true, None));
+        // Shift+Enter on a folder: the other of play and enqueue, for all the folder holds.
+        assert_eq!(t.key(AT, Key::Enter, true), (true, Some(Command::LibraryOpenOther)), "not gone into");
+        assert_eq!(names(&t), ["Albums", "a", "Z"]);
+        assert_eq!(t.picked().iter().map(|p| label(p)).collect::<Vec<_>>(), ["Albums"], "the folder, which expands to everything in it");
         assert_eq!(t.key(AT, Key::Enter, false), (true, None), "Enter on a folder goes in");
         assert_eq!(names(&t), ["..", "Live", "b"]);
         t.key(AT, Key::Down, false);

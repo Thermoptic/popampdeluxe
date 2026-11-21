@@ -32,6 +32,8 @@
 
   In the right list it works as before: right-click a folder, or a song,
   and choose Enqueue to add that one (a folder with everything in it).
+  Shift+Enter on a folder there does the same, adding the folder with all it
+  holds; Enter goes into the folder.
 
 
   2026-11-21   JUMP TO FILE IN THE MEDIA LIBRARY

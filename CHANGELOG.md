@@ -22,6 +22,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Media Library Foldertree: Shift+Enter on a folder in the right list does the other of play and
+  enqueue with everything the folder holds (the subfolders too), instead of going into the folder.
+  Enter still goes in.
 - Media Library Foldertree: Play and Enqueue on a folder of the left list (right-click it, or
   click it and press Enter / Shift+Enter) take everything in the folder, the folders inside it
   too; on a group they take the folders of the group. Before, they only took the songs
