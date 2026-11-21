@@ -1278,6 +1278,7 @@ impl Model {
             C::PlaylistSave => self.request_dialog(DialogKind::SavePlaylist),
             C::JumpToTime => self.request_dialog(DialogKind::JumpToTime),
             C::JumpToFile => self.ui.push(UiReq::Panel(PanelKind::JumpToFile)),
+            C::LibraryJump => self.ui.push(UiReq::Panel(PanelKind::LibraryJump)),
             C::LibraryEditFolders => self.ui.push(UiReq::Panel(PanelKind::FolderEditor)),
             C::FileInfo => self.ui.push(UiReq::Panel(PanelKind::FileInfo)),
             C::PlGenerateHtml => self.request_dialog(DialogKind::SaveHtml),

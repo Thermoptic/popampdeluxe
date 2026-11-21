@@ -20,6 +20,8 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PanelKind {
     JumpToFile,
+    /// The same search for the files in the Media Library's folder tree.
+    LibraryJump,
     FileInfo,
     Preferences,
     #[cfg(feature = "plugins")]
@@ -89,6 +91,7 @@ pub enum Act {
 
 pub enum Panel {
     Jump(JumpToFile),
+    LibJump(LibraryJump),
     Info(FileInfo),
     Prefs(Preferences),
     #[cfg(feature = "plugins")]
@@ -106,6 +109,7 @@ impl Panel {
     pub fn open(kind: PanelKind, model: &Model) -> Panel {
         match kind {
             PanelKind::JumpToFile => Panel::Jump(JumpToFile::new(model)),
+            PanelKind::LibraryJump => Panel::LibJump(LibraryJump::new(model)),
             PanelKind::FileInfo => Panel::Info(FileInfo::new(model)),
             PanelKind::Preferences => Panel::Prefs(Preferences::new(
                 model.settings(),
@@ -129,6 +133,7 @@ impl Panel {
     pub fn kind(&self) -> PanelKind {
         match self {
             Panel::Jump(_) => PanelKind::JumpToFile,
+            Panel::LibJump(_) => PanelKind::LibraryJump,
             Panel::Info(_) => PanelKind::FileInfo,
             Panel::Prefs(_) => PanelKind::Preferences,
             #[cfg(feature = "plugins")]
@@ -146,6 +151,7 @@ impl Panel {
     pub fn title(&self) -> &'static str {
         match self {
             Panel::Jump(_) => "Jump to file",
+            Panel::LibJump(_) => "Jump to file in the library",
             Panel::Info(_) => "File info",
             Panel::Prefs(_) => "Popamp Preferences",
             #[cfg(feature = "plugins")]
@@ -163,6 +169,7 @@ impl Panel {
     pub fn form(&self) -> &Form<Act> {
         match self {
             Panel::Jump(p) => &p.form,
+            Panel::LibJump(p) => &p.form,
             Panel::Info(p) => &p.form,
             Panel::Prefs(p) => &p.form,
             #[cfg(feature = "plugins")]
@@ -180,6 +187,7 @@ impl Panel {
     pub fn form_mut(&mut self) -> &mut Form<Act> {
         match self {
             Panel::Jump(p) => &mut p.form,
+            Panel::LibJump(p) => &mut p.form,
             Panel::Info(p) => &mut p.form,
             Panel::Prefs(p) => &mut p.form,
             #[cfg(feature = "plugins")]
@@ -199,6 +207,7 @@ impl Panel {
     pub fn handle(&mut self, ev: Event<Act>, model: &mut Model) -> bool {
         match self {
             Panel::Jump(p) => p.handle(ev, model),
+            Panel::LibJump(p) => p.handle(ev, model),
             Panel::Info(p) => p.handle(ev, model),
             Panel::Prefs(p) => p.handle(ev, model),
             #[cfg(feature = "plugins")]
@@ -371,6 +380,62 @@ impl JumpToFile {
             Event::Clicked(Act::Ok) | Event::Activated => match self.form.selected(self.list).and_then(|r| self.shown.get(r)) {
                 Some(&i) => {
                     model.play_index(i);
+                    false
+                }
+                None => true,
+            },
+            Event::Clicked(_) | Event::Cancel => false,
+            _ => true,
+        }
+    }
+}
+
+/// Search the files of the folder the Media Library shows as you type; Enter
+/// goes to the one picked, as a double click on it would.
+pub struct LibraryJump {
+    form: Form<Act>,
+    search: usize,
+    list: usize,
+    /// The place in the library's right list of each visible row.
+    shown: Vec<usize>,
+}
+
+impl LibraryJump {
+    fn new(model: &Model) -> LibraryJump {
+        let (w, list_h) = (460, 4 + 16 * ROW_H);
+        let mut form = Form::new(w, 10 + 24 + 8 + list_h + 10 + BUTTON.1 + 10);
+        form.add(Rect::new(10, 10, 70, 24), Widget::Label { text: "Search for:".into(), dim: false });
+        let search = form.add(Rect::new(80, 10, w - 90, 24), Widget::Input { text: String::new(), cursor: 0 });
+        let list = form.add(Rect::new(10, 42, w - 20, list_h), Widget::List { rows: vec![], selected: None, scroll: 0 });
+        let by = 42 + list_h + 10;
+        button(&mut form, w - 2 * BUTTON.0 - 16, by, "Jump", Act::Ok, true);
+        button(&mut form, w - BUTTON.0 - 10, by, "Close", Act::Close, false);
+        let mut p = LibraryJump { form, search, list, shown: vec![] };
+        p.refilter(model);
+        p
+    }
+
+    /// Lists the files and folders matching the search.
+    fn refilter(&mut self, model: &Model) {
+        let rows = model.library.tree.jump_rows();
+        let found = search(rows.iter().map(|r| r.1.as_str()), self.form.text(self.search));
+        self.shown = found.iter().map(|&i| rows[i].0).collect();
+        let texts = found.iter().map(|&i| rows[i].1.clone()).collect();
+        self.form.set_rows(self.list, texts, Some(0));
+    }
+
+    fn handle(&mut self, ev: Event<Act>, model: &mut Model) -> bool {
+        match ev {
+            Event::Edited => {
+                self.refilter(model);
+                true
+            }
+            Event::Clicked(Act::Ok) | Event::Activated => match self.form.selected(self.list).and_then(|r| self.shown.get(r)) {
+                Some(&n) => {
+                    if let Some(c) = model.library.tree.jump_to(n) {
+                        model.exec(c);
+                    }
+                    model.pl_dirty += 1;
                     false
                 }
                 None => true,
@@ -1936,6 +2001,33 @@ pub(crate) mod tests {
         push(&mut p, &mut m, Act::HotkeysAllDefault);
         assert!(BINDINGS.iter().enumerate().all(|(i, _)| m.keymap.is_default(i)));
         let _ = Chord::parse("A");
+    }
+
+    #[test]
+    fn jump_to_file_in_the_library_filters_the_files_seen_and_picks_the_one_chosen() {
+        let dir = std::env::temp_dir().join(format!("popamp-libjump-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for f in ["alpha one.mp3", "beta two.mp3", "alpha three.mp3"] {
+            std::fs::write(dir.join(f), b"x").unwrap();
+        }
+        let mut m = songs(&[]);
+        m.set_library_type(true);
+        m.library.tree.add_root(&dir.to_string_lossy());
+        let mut p = Panel::open(PanelKind::LibraryJump, &m);
+        let rows = |p: &Panel| -> Vec<String> {
+            let Panel::LibJump(j) = p else { panic!("not the library's jump window") };
+            let Widget::List { rows, .. } = j.form.widget(j.list) else { panic!() };
+            rows.clone()
+        };
+        assert_eq!(rows(&p), ["alpha one", "alpha three", "beta two"]);
+        type_text(&mut p, &mut m, "alpha");
+        assert_eq!(rows(&p), ["alpha one", "alpha three"], "filtered as you type");
+        type_text(&mut p, &mut m, " three");
+        assert_eq!(rows(&p), ["alpha three"]);
+        assert!(!press(&mut p, &mut m, Key::Enter), "Enter goes to it and closes the window");
+        assert!(m.library.picked().iter().any(|f| f.ends_with("alpha three.mp3")), "the file is the one picked now");
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]

@@ -47,6 +47,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Jump to file in the Media Library's folder tree:** press J in the Media Library
+  window (or choose *Jump to file...* in its menu) and a search box lists the files and
+  folders of the folder on screen, filtered as you type, as J does in the playlist.
+  Enter goes to the one picked: a folder is opened, a file is picked and played or
+  enqueued as a double click does. The other kind of library types the letters into
+  its own search box, as before.
 - **Add shortcut** in Preferences > Shortcuts: a new installation has one row of
   title-bar shortcut; the button under the last row, at the right edge of the
   lists, adds another (up to ten). The rows you saved are shown again, at least

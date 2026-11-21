@@ -1758,6 +1758,12 @@ impl App {
         let cmd = scope
             .and_then(|s| self.model.keymap.find(s, code, ctrl, shift, alt))
             .or_else(|| self.model.keymap.find(Scope::Global, code, ctrl, shift, alt));
+        // In the Media Library's folder tree, Jump to file searches its files
+        // (the other library types the letters into its search box already).
+        let cmd = match cmd {
+            Some(Command::JumpToFile) if k == WindowKey::Library && self.model.library.tree_mode => Some(Command::LibraryJump),
+            c => c,
+        };
         if let Some(c) = cmd {
             return self.run(el, c);
         }

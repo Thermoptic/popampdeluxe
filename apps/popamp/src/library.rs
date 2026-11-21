@@ -1220,6 +1220,7 @@ impl Model {
             MenuItem::cmd("Rescan folders", "", Command::LibraryRescan),
         ];
         if self.library.tree_mode {
+            items.push(MenuItem::cmd("Jump to file…", "J", Command::LibraryJump));
             items.push(MenuItem::cmd("Folders and groups…", "", Command::LibraryEditFolders));
         }
         if let Some(folder) = self.library.folder() {

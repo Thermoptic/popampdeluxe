@@ -654,6 +654,34 @@ impl FolderTree {
         }
     }
 
+    /// The rows of the right list that the jump window searches: the place
+    /// of each in the list, and how it is written (a folder in brackets).
+    pub fn jump_rows(&self) -> Vec<(usize, String)> {
+        self.entries
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| !e.up)
+            .map(|(n, e)| {
+                let name = if self.hide_ext { &e.name } else { &e.file };
+                (n, if e.dir { format!("[{name}]") } else { name.clone() })
+            })
+            .collect()
+    }
+
+    /// Goes to row `n` of the right list: a folder is gone into, a file is
+    /// the only one picked, and its command (play or enqueue, as a double
+    /// click does) is returned.
+    pub fn jump_to(&mut self, n: usize) -> Option<Command> {
+        let e = self.entries.get(n).cloned()?;
+        if e.dir {
+            self.enter(&e.path);
+            return None;
+        }
+        self.select_only(n);
+        self.scroll[1] = n.saturating_sub(3);
+        Some(Command::LibraryOpen)
+    }
+
     fn select_only(&mut self, n: usize) {
         self.selected.fill(false);
         self.selected[n] = true;
@@ -938,6 +966,25 @@ mod tests {
         // Row 0 a folder (filled), row 1 the group (hollow), row 2 under it (an L).
         assert_eq!((at(0, 4, 3), at(1, 4, 3), at(1, 0, 3), at(1, 7, 3)), (ink, bg, ink, ink), "a hollow folder for the group");
         assert_eq!((at(2, 3, 0), at(2, 3, 3), at(2, 6, 3), at(2, 0, 0)), (ink, ink, ink, bg), "an L for the folder in it");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn the_jump_window_searches_the_right_list_and_goes_to_what_is_found() {
+        let (root, mut t) = music("jump");
+        t.hide_ext = true;
+        t.reload();
+        let rows = t.jump_rows();
+        let texts: Vec<&str> = rows.iter().map(|r| r.1.as_str()).collect();
+        assert_eq!(texts, ["[Albums]", "a", "Z"], "folders in brackets, no .mp3, no note, no ..");
+        // A file: the only one picked, and the command a double click runs.
+        let z = rows.iter().find(|r| r.1 == "Z").unwrap().0;
+        assert_eq!(t.jump_to(z), Some(Command::LibraryOpen));
+        assert_eq!(t.picked().iter().map(|p| label(p)).collect::<Vec<_>>(), ["Z.MP3"]);
+        // A folder: gone into, nothing to run.
+        let albums = rows[0].0;
+        assert_eq!(t.jump_to(albums), None);
+        assert_eq!(names(&t), ["..", "Live", "b"], "inside Albums, with the row that goes back");
         let _ = std::fs::remove_dir_all(root);
     }
 
