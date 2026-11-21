@@ -668,18 +668,15 @@ impl FolderTree {
             .collect()
     }
 
-    /// Goes to row `n` of the right list: a folder is gone into, a file is
-    /// the only one picked, and its command (play or enqueue, as a double
-    /// click does) is returned.
-    pub fn jump_to(&mut self, n: usize) -> Option<Command> {
-        let e = self.entries.get(n).cloned()?;
-        if e.dir {
-            self.enter(&e.path);
-            return None;
+    /// Marks row `n` of the right list, a folder or a file, as the only one
+    /// picked, and scrolls to it. Nothing is opened or played.
+    pub fn jump_to(&mut self, n: usize) {
+        if n >= self.entries.len() {
+            return;
         }
         self.select_only(n);
-        self.scroll[1] = n.saturating_sub(3);
-        Some(Command::LibraryOpen)
+        self.focus = Some(List::Tracks);
+        self.scroll[slot(List::Tracks)] = n.saturating_sub(2);
     }
 
     fn select_only(&mut self, n: usize) {
@@ -977,14 +974,16 @@ mod tests {
         let rows = t.jump_rows();
         let texts: Vec<&str> = rows.iter().map(|r| r.1.as_str()).collect();
         assert_eq!(texts, ["[Albums]", "a", "Z"], "folders in brackets, no .mp3, no note, no ..");
-        // A file: the only one picked, and the command a double click runs.
+        // A file: marked as the only one picked; nothing is played.
         let z = rows.iter().find(|r| r.1 == "Z").unwrap().0;
-        assert_eq!(t.jump_to(z), Some(Command::LibraryOpen));
+        t.jump_to(z);
         assert_eq!(t.picked().iter().map(|p| label(p)).collect::<Vec<_>>(), ["Z.MP3"]);
-        // A folder: gone into, nothing to run.
+        assert_eq!(names(&t), ["Albums", "a", "Z"], "still the same folder");
+        // A folder: marked too, not opened.
         let albums = rows[0].0;
-        assert_eq!(t.jump_to(albums), None);
-        assert_eq!(names(&t), ["..", "Live", "b"], "inside Albums, with the row that goes back");
+        t.jump_to(albums);
+        assert_eq!(t.picked().iter().map(|p| label(p)).collect::<Vec<_>>(), ["Albums"]);
+        assert_eq!(names(&t), ["Albums", "a", "Z"], "not gone into");
         let _ = std::fs::remove_dir_all(root);
     }
 

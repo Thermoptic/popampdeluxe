@@ -432,9 +432,8 @@ impl LibraryJump {
             }
             Event::Clicked(Act::Ok) | Event::Activated => match self.form.selected(self.list).and_then(|r| self.shown.get(r)) {
                 Some(&n) => {
-                    if let Some(c) = model.library.tree.jump_to(n) {
-                        model.exec(c);
-                    }
+                    // Marked in the library's list, not opened or played.
+                    model.library.tree.jump_to(n);
                     model.pl_dirty += 1;
                     false
                 }
@@ -2025,7 +2024,7 @@ pub(crate) mod tests {
         assert_eq!(rows(&p), ["alpha one", "alpha three"], "filtered as you type");
         type_text(&mut p, &mut m, " three");
         assert_eq!(rows(&p), ["alpha three"]);
-        assert!(!press(&mut p, &mut m, Key::Enter), "Enter goes to it and closes the window");
+        assert!(!press(&mut p, &mut m, Key::Enter), "Enter marks it and closes the window");
         assert!(m.library.picked().iter().any(|f| f.ends_with("alpha three.mp3")), "the file is the one picked now");
         let _ = std::fs::remove_dir_all(dir);
     }

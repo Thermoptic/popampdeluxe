@@ -28,11 +28,9 @@
   active), or choose "Jump to file..." in its right-click menu. A search box
   opens with a list of the files and folders you see in the right list.
   Type a few words to filter them, as J does in the playlist window. Enter
-  (or "Jump") goes to the one picked:
-
-     * a folder is opened;
-     * a file is played or added to the playlist, as a double click on it
-       does (Preferences > Media Library: "Enter and double-click enqueue").
+  (or "Jump") marks the one picked, a folder or a song, in the Media
+  Library's list and scrolls to it. Nothing is opened or played: you then
+  press Enter or double-click it, as always.
 
   The key is the "Jump to file" hotkey (Preferences > Hotkeys), so if you
   change it there, it changes here too. The Media Library id3 type has a
