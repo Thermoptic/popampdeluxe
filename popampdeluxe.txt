@@ -21,6 +21,19 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-22   ENQUEUE A WHOLE FOLDER IN THE MEDIA LIBRARY
+  ..........................................................................
+
+  Media Library Foldertree: right-click a folder in the left column and
+  choose "Enqueue" (or "Play"), and every song in that folder, in the
+  folders inside it too, goes to the playlist. Right-click a group and
+  you get the folders of the group. The same goes for clicking a folder in
+  the left column and pressing Enter or Shift+Enter.
+
+  In the right list it works as before: right-click a folder, or a song,
+  and choose Enqueue to add that one (a folder with everything in it).
+
+
   2026-11-21   JUMP TO FILE IN THE MEDIA LIBRARY
   ..........................................................................
 

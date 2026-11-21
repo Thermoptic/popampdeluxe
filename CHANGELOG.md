@@ -14,6 +14,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Media Library Foldertree: Play and Enqueue on a folder of the left list (right-click it, or
+  click it and press Enter / Shift+Enter) take everything in the folder, the folders inside it
+  too; on a group they take the folders of the group. Before, they only took the songs
+  that sat directly in the folder. In the right list nothing changed: the row you right-click
+  is what they take, a folder there with all it holds.
 - A window opened with a key (J for Jump to file, in the playlist and the Media Library)
   no longer gets that key's letter typed into its search box: the box is empty and the
   caret is in it, ready for typing.

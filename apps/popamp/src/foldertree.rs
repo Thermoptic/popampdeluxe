@@ -119,6 +119,9 @@ pub struct FolderTree {
     pub items: Vec<Item>,
     /// The picked folder, by its place in `items`.
     root: Option<usize>,
+    /// The row of the left list last clicked (a group too), by its place in
+    /// `items`: while that list has the focus, Play and Enqueue take all it holds.
+    left: Option<usize>,
     /// The folder the right list shows: the root or one inside it.
     dir: Option<PathBuf>,
     entries: Vec<Entry>,
@@ -230,6 +233,7 @@ impl FolderTree {
     /// Takes the picked folder out of the left list; its files stay.
     pub fn remove_root(&mut self) {
         let Some(i) = self.root else { return };
+        self.left = None;
         self.items.remove(i);
         normalize(&mut self.items);
         self.scroll = [0, 0];
@@ -245,6 +249,7 @@ impl FolderTree {
     pub fn set_items(&mut self, mut items: Vec<Item>) {
         normalize(&mut items);
         let on = self.folder().map(String::from);
+        self.left = None;
         self.items = items;
         let found = on.and_then(|p| self.items.iter().position(|i| matches!(i, Item::Folder { path, .. } if *path == p)));
         match found {
@@ -259,6 +264,7 @@ impl FolderTree {
     /// A row of the left list was picked: a group folds in or out, a folder shows.
     fn pick_row(&mut self, n: usize) {
         let Some(&i) = self.shown().get(n) else { return };
+        self.left = Some(i);
         match self.items[i] {
             Item::Group { ref mut open, .. } => *open = !*open,
             Item::Folder { .. } if self.root != Some(i) => self.pick_root(i),
@@ -393,6 +399,23 @@ impl FolderTree {
     /// The paths of the picked rows: files and folders, in the order of the
     /// list; all the files when none is picked. A folder plays all it holds.
     pub fn picked(&self) -> Vec<String> {
+        // With the left list in hand: the folder clicked there, all of it, or
+        // the folders of the group clicked.
+        if self.focus == Some(List::Views) {
+            match self.left.and_then(|i| self.items.get(i).map(|it| (i, it))) {
+                Some((_, Item::Folder { path, .. })) => return vec![path.clone()],
+                Some((i, Item::Group { .. })) => {
+                    return self.items[i + 1..]
+                        .iter()
+                        .map_while(|it| match it {
+                            Item::Folder { path, child: true, .. } => Some(path.clone()),
+                            _ => None,
+                        })
+                        .collect();
+                }
+                None => {}
+            }
+        }
         let some = self.selected.contains(&true);
         let rows = self.entries.iter().zip(&self.selected).filter(|(e, &on)| !e.up && if some { on } else { !e.dir });
         rows.map(|(e, _)| e.path.clone()).collect()
@@ -646,11 +669,18 @@ impl FolderTree {
 
     pub fn press_right(&mut self, at: Place, x: i32, y: i32) {
         let p = Parts::new(at, false);
-        if let Some(n) = self.row_at(&p, List::Tracks, x, y).filter(|&n| !self.selected[n]) {
-            self.select_only(n);
+        if let Some(n) = self.row_at(&p, List::Tracks, x, y) {
+            self.focus = Some(List::Tracks);
+            if !self.selected[n] {
+                self.select_only(n);
+            }
         } else if let Some(n) = self.row_at(&p, List::Views, x, y) {
+            // A folder (or group) of the left list: the menu is for all it holds.
             self.focus = Some(List::Views);
-            self.pick_root(n);
+            if let Some(&i) = self.shown().get(n) {
+                self.left = Some(i);
+                self.pick_root(i);
+            }
         }
     }
 
@@ -846,12 +876,14 @@ impl FolderTree {
         }
         .min(len - 1);
         if list == List::Views {
+            self.left = None;
             // A group is no folder to show: go on to the nearest folder.
             let up = to < cur || key == Key::Home;
             let ok = |n: &usize| self.items[rows[*n]].is_folder();
             let found = if up { (0..=to).rev().find(ok) } else { (to..len).find(ok) };
             let Some(n) = found.or_else(|| if up { (to..len).find(ok) } else { (0..=to).rev().find(ok) }) else { return };
             to = n;
+            self.left = Some(rows[to]);
             self.pick_root(rows[to]);
         }
         match list {
@@ -984,6 +1016,32 @@ mod tests {
         t.jump_to(albums);
         assert_eq!(t.picked().iter().map(|p| label(p)).collect::<Vec<_>>(), ["Albums"]);
         assert_eq!(names(&t), ["Albums", "a", "Z"], "not gone into");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn enqueue_on_a_folder_of_the_left_list_takes_all_it_holds_and_on_a_row_of_the_right_one_that_row() {
+        let (root, mut t) = music("left-pick");
+        let albums = root.join("Albums");
+        let lines = vec![
+            format!("folder|0||{}", root.to_string_lossy()),
+            "group|1|G".to_string(),
+            format!("folder|1||{}", albums.to_string_lossy()),
+        ];
+        t = FolderTree::from_lines(&lines);
+        let p = Parts::new(AT, false);
+        let left = |n: i32| (p.views.x + 5, p.views.y + n * p.row_h + 2);
+        // Right-click the first folder of the left list: the folder itself, all of it.
+        let (x, y) = left(0);
+        t.press_right(AT, x, y);
+        assert_eq!(t.picked(), [root.to_string_lossy().to_string()], "the whole folder, which expands to every song in it");
+        // A group: the folders in it.
+        let (x, y) = left(1);
+        t.press_right(AT, x, y);
+        assert_eq!(t.picked(), [albums.to_string_lossy().to_string()]);
+        // A row of the right list: that row, as before.
+        t.press_right(AT, p.table.rows.x + 20, p.table.rows.y + p.row_h + 2);
+        assert_eq!(t.picked().iter().map(|p| label(p)).collect::<Vec<_>>(), ["a.mp3"]);
         let _ = std::fs::remove_dir_all(root);
     }
 
