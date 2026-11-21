@@ -99,6 +99,9 @@ struct PanelWindow {
     /// The mouse, in the form's dialog pixels.
     cursor: (i32, i32),
     last_click: Option<(Instant, (i32, i32))>,
+    /// The letter of the key that opened the window and when: the key's own
+    /// letter may reach the new window as typing, and is not wanted there.
+    swallow: Option<(Instant, String)>,
     /// The height of the skin's title bar above the form, in dialog pixels;
     /// 0 when the window has the system's own title bar.
     bar_h: i32,
@@ -138,6 +141,8 @@ pub struct App {
     off_bar: [bool; 4],
     capture: Option<WindowKey>,
     mods: ModifiersState,
+    /// The text of the key pressed last, and when.
+    last_key: Option<(Instant, Option<String>)>,
     last_click: Option<(WindowKey, Instant, (i32, i32))>,
     drops: Vec<(WindowKey, String)>,
     drop_time: Instant,
@@ -190,6 +195,7 @@ impl App {
             off_bar: [false; 4],
             capture: None,
             mods: ModifiersState::empty(),
+            last_key: None,
             last_click: None,
             drops: Vec::new(),
             drop_time: Instant::now(),
@@ -846,7 +852,9 @@ impl App {
             log::warn!("cannot tie the dialog to the main window: {e}");
         }
         let frame = Bitmap::new(w, h, 0);
-        self.panels.push(PanelWindow { window, surface, panel, frame, pct, cursor: (0, 0), last_click: None, bar_h });
+        // A window opened by a key: that key's letter is not typing in it.
+        let swallow = self.last_key.clone().filter(|(t, _)| t.elapsed() < Duration::from_millis(400)).and_then(|(t, text)| Some((t, text?)));
+        self.panels.push(PanelWindow { window, surface, panel, frame, pct, cursor: (0, 0), last_click: None, swallow, bar_h });
         self.panel_changed(self.panels.len() - 1);
     }
 
@@ -934,6 +942,17 @@ impl App {
                 if p.panel.raw_key(code, mods, &mut self.model) {
                     self.panel_changed(i);
                     return;
+                }
+            }
+        }
+        if let WindowEvent::KeyboardInput { event, .. } = &ev {
+            if event.state == ElementState::Pressed {
+                if let Some((since, letter)) = p.swallow.take() {
+                    let same = event.text.as_deref().is_some_and(|t| t.eq_ignore_ascii_case(&letter))
+                        || matches!(&event.logical_key, winit::keyboard::Key::Character(c) if c.eq_ignore_ascii_case(&letter));
+                    if same && since.elapsed() < Duration::from_millis(600) {
+                        return;
+                    }
                 }
             }
         }
@@ -1673,6 +1692,7 @@ impl App {
         if ev.state != ElementState::Pressed {
             return;
         }
+        self.last_key = Some((Instant::now(), ev.text.as_ref().map(|t| t.to_string())));
         let PhysicalKey::Code(code) = ev.physical_key else { return };
         if !self.popups.is_empty() {
             self.popup_key(el, code);

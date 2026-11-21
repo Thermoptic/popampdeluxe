@@ -14,6 +14,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A window opened with a key (J for Jump to file, in the playlist and the Media Library)
+  no longer gets that key's letter typed into its search box: the box is empty and the
+  caret is in it, ready for typing.
 - The shaded playlist window of the *popamp-classified* theme (and any skin whose shade
   strip has an edge at the left end of its picture) no longer shows a row of boxes
   along the bar: the middle of the strip repeats a stretch from inside the left piece,
