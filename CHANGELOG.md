@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `tools/wsz2psz.py` converts a classic Winamp 2 skin (`.wsz` or a folder) to a vector
+  skin (`.psz`): every bitmap becomes an SVG sheet of flat-coloured areas, and the
+  playlist colours and the visualizer colours are carried over. Rendered at x1 the result
+  is pixel for pixel the original (checked on Winamp Base 2.91). See
+  [skin-format.md](docs/skin-format.md#converting-a-bitmap-skin).
+
 ### Changed
 
 - The repository's `skins` folder holds only `popamp-classified.psz`. Winamp Classic

@@ -423,6 +423,15 @@ skin.toml, line 12: unknown command `plya`; it can be one of: exit, ...
 
 ## Converting a bitmap skin
 
+`tools/wsz2psz.py skin.wsz` converts a classic skin by itself, with no
+extra packages: each bitmap becomes an SVG sheet of merged flat-coloured
+rectangles drawn with crisp edges, and `pledit.txt` and `viscolor.txt` go
+into `[playlist]` and `[vis]`. At x1 it is pixel for pixel the bitmap;
+at fractional sizes the pixels stay sharp. The playlist font, the cursors
+and the `gen`, `genex`, `mb` and `video` sheets are not converted. It is a
+starting point: to get smooth shapes at every size, redraw the sheets by
+hand as described below.
+
 Redraw the design with the simplest primitives; do not trace its pixels.
 Matching the bitmap pixel for pixel with thousands of tiny shapes is the
 wrong goal: such a sheet is heavy and shows seams at fractional scales.
