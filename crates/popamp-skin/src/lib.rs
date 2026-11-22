@@ -64,7 +64,10 @@ impl Skin {
     /// As [`Skin::builtin_vector`], with every colour taken from `scheme`.
     pub fn builtin_vector_with(colors: Option<&str>, scheme: Option<&base16::Scheme>) -> Skin {
         // The vector skin of the popamp-skin-default repository, built in.
-        let files = popamp_skin_default::FILES.iter().map(|(name, data)| (name.to_string(), data.to_vec())).collect();
+        let files = popamp_skin_default::FILES
+            .iter()
+            .map(|(name, data)| (name.to_string(), if *name == "eq_ex.svg" { with_shade_slots(data) } else { data.to_vec() }))
+            .collect();
         // The files are part of the program; a test loads them.
         vector::load_onto(Skin::bare(), &files, colors, scheme).expect("the built-in skin loads")
     }
@@ -520,4 +523,14 @@ mod tests {
         assert!(check_archive(&zip_of(&[("eqmain.bmp", &png)])).unwrap_err().contains("main window"));
         assert!(check_archive(&zip_of(&[("main.bmp", b"junk")])).is_err());
     }
+}
+
+/// The built-in skin's equalizer windowshade strip has no surface behind its volume and balance
+/// sliders, only the title: the two slots of Popamp Classified are put there, over the title.
+fn with_shade_slots(svg: &[u8]) -> Vec<u8> {
+    let mut s = String::from_utf8_lossy(svg).into_owned();
+    if let Some(at) = s.rfind("</svg>") {
+        s.insert_str(at, include_str!("eq_shade_slots.svgfrag"));
+    }
+    s.into_bytes()
 }

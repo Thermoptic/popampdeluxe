@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- The equalizer's windowshade strip in the default skin has a surface behind its volume and balance sliders (the slots of Popamp Classified) with light handles, in place of the title text they used to sit on.
 - The playlist's windowshade strip in the default skin no longer has differently coloured left and right ends while the window is active: its middle now has an active picture as well as an inactive one.
 - The Media Library shows its title, MEDIA LIBRARY, in the windowshade strip too, in vector skins.
 - Long drop-downs (the Palette list) have a scroll bar you can drag, and the mouse wheel scrolls the list without picking anything. A palette is applied only by a click on a name or by the arrow keys.
