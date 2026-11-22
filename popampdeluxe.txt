@@ -21,6 +21,16 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-22   HISTORY FOLDER IN THE MEDIA LIBRARY
+  ..........................................................................
+
+  Media Library > Folders and groups > Show History folder
+
+  Tick "Show History folder" (to the right of "Show Bookmarks folder") and
+  the library's left list gets a History folder. It lists the tracks you
+  played lately, newest first; play them like any other folder.
+
+
   2026-11-22   HISTORY LOG COUNT
   ..........................................................................
 

@@ -164,6 +164,11 @@ pub struct Model {
 }
 
 /// How a bookmark shows in menus and lists: its title, else its location.
+/// A play as the Media Library's History folder lists it: where, and the title.
+fn history_row(p: &Played) -> (String, String) {
+    (p.location.clone(), if p.title.is_empty() { p.location.clone() } else { p.title.clone() })
+}
+
 fn bookmark_label(b: &Item) -> String {
     b.title.clone().filter(|t| !t.is_empty()).unwrap_or_else(|| b.location.clone())
 }
@@ -273,6 +278,7 @@ impl Model {
         library.tree_mode = config.settings.ml_foldertree;
         library.tree.hide_ext = config.settings.ml_hide_ext;
         library.tree.set_bookmarks(bookmarks.iter().map(|b| (b.location.clone(), bookmark_label(b))).collect());
+        library.tree.set_history(history.newest_first().map(history_row).collect());
         // The window as it was left: the folder, the place in it, the order.
         library.restore(&|key| config.state(key).map(String::from));
         let skin = Skin::builtin_vector_with(Some(&config.settings.skin_colors), popamp_skin::base16::find(&config.settings.skin_palette));
@@ -510,6 +516,7 @@ impl Model {
         let n = n.clamp(10, 100_000);
         self.settings_mut().history_limit = n as i32;
         self.history.set_limit(n as usize);
+        self.library.tree.set_history(self.history.newest_first().map(history_row).collect());
     }
 
     pub fn set_title_format(&mut self, fmt: &str) {
@@ -807,6 +814,7 @@ impl Model {
             file_name = Some(e.location.rsplit('/').next().unwrap_or("").to_string());
             let played = Played { at: history::now(), location: e.location.clone(), title: e.display.clone() };
             self.history.record(&self.paths.history_file(), played);
+            self.library.tree.set_history(self.history.newest_first().map(history_row).collect());
         }
         if autoload {
             if let Some(name) = file_name {

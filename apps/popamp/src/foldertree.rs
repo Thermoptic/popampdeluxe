@@ -52,6 +52,20 @@ pub fn is_bookmarks(path: &str) -> bool {
     path == BOOKMARKS
 }
 
+/// The path of the History folder in the left list: no real folder either,
+/// the tracks played lately, the newest first.
+pub const HISTORY: &str = "popamp:history";
+
+/// Whether `path` is the History folder.
+pub fn is_history(path: &str) -> bool {
+    path == HISTORY
+}
+
+/// Whether `path` is a folder that is not on disk: Bookmarks or History.
+pub fn is_virtual(path: &str) -> bool {
+    is_bookmarks(path) || is_history(path)
+}
+
 /// A line of the left list: a group, or a folder that may be in a group.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Item {
@@ -79,6 +93,11 @@ impl Item {
     /// Whether this is the Bookmarks folder.
     pub fn is_bookmarks(&self) -> bool {
         matches!(self, Item::Folder { path, .. } if is_bookmarks(path))
+    }
+
+    /// Whether this is the History folder.
+    pub fn is_history(&self) -> bool {
+        matches!(self, Item::Folder { path, .. } if is_history(path))
     }
 
     /// The line it is kept as in the ini file: `group|1|Name` (1: unfolded)
@@ -136,6 +155,8 @@ pub struct FolderTree {
     /// The player's bookmarks, as the right list shows them when the Bookmarks
     /// folder is picked: where each is, and how it is written.
     bookmarks: Vec<(String, String)>,
+    /// The tracks played lately, newest first, as the History folder shows them.
+    history: Vec<(String, String)>,
     /// The row of the left list last clicked (a group too), by its place in
     /// `items`: while that list has the focus, Play and Enqueue take all it holds.
     left: Option<usize>,
@@ -176,6 +197,9 @@ pub fn path_label(path: &str) -> String {
 fn label(path: &str) -> String {
     if is_bookmarks(path) {
         return "Bookmarks".into();
+    }
+    if is_history(path) {
+        return "History".into();
     }
     Path::new(path).file_name().map_or_else(|| path.to_string(), |n| n.to_string_lossy().into_owned())
 }
@@ -232,8 +256,22 @@ impl FolderTree {
         }
     }
 
+    /// The tracks played lately (newest first); the right list shows them
+    /// while the History folder is on screen.
+    pub fn set_history(&mut self, list: Vec<(String, String)>) {
+        let showing = self.showing_history();
+        self.history = list;
+        if showing {
+            self.reload();
+        }
+    }
+
     fn showing_bookmarks(&self) -> bool {
         self.dir.as_deref().and_then(Path::to_str).is_some_and(is_bookmarks)
+    }
+
+    fn showing_history(&self) -> bool {
+        self.dir.as_deref().and_then(Path::to_str).is_some_and(is_history)
     }
 
     /// What the window is like, to come back to it: the folder picked, the
@@ -271,7 +309,7 @@ impl FolderTree {
             self.pick_root(i);
             let inside = get("ft_dir").filter(|d| !d.is_empty()).filter(|d| {
                 let root = root.as_deref().unwrap_or_default();
-                is_bookmarks(root) && d == root || !is_bookmarks(root) && Path::new(d).starts_with(root) && Path::new(d).is_dir()
+                is_virtual(root) && d == root || !is_virtual(root) && Path::new(d).starts_with(root) && Path::new(d).is_dir()
             });
             if let Some(dir) = inside {
                 self.dir = Some(PathBuf::from(dir));
@@ -412,8 +450,9 @@ impl FolderTree {
     pub fn reload(&mut self) {
         self.entries.clear();
         self.unreadable = false;
-        if self.showing_bookmarks() {
-            for (location, text) in &self.bookmarks {
+        if self.showing_bookmarks() || self.showing_history() {
+            let list = if self.showing_history() { &self.history } else { &self.bookmarks };
+            for (location, text) in list {
                 let entry = Entry { name: text.clone(), file: text.clone(), path: location.clone(), dir: false, up: false, modified: None };
                 self.entries.push(entry);
             }
@@ -445,8 +484,11 @@ impl FolderTree {
                 }
             }
         }
-        self.order();
-        let above = self.dir.as_deref().filter(|d| !self.showing_bookmarks() && self.folder().map(Path::new) != Some(*d)).and_then(Path::parent);
+        // The history is in the order it was played unless a column is clicked.
+        if !(self.showing_history() && self.sort.is_none()) {
+            self.order();
+        }
+        let above = self.dir.as_deref().filter(|d| !self.showing_bookmarks() && !self.showing_history() && self.folder().map(Path::new) != Some(*d)).and_then(Path::parent);
         if let Some(parent) = above {
             let up = Entry { name: "..".into(), file: "..".into(), path: parent.to_string_lossy().into_owned(), dir: true, up: true, modified: None };
             self.entries.insert(0, up);
@@ -501,6 +543,7 @@ impl FolderTree {
         if self.focus == Some(List::Views) {
             match self.left.and_then(|i| self.items.get(i).map(|it| (i, it))) {
                 Some((_, Item::Folder { path, .. })) if is_bookmarks(path) => return self.bookmarks.iter().map(|b| b.0.clone()).collect(),
+                Some((_, Item::Folder { path, .. })) if is_history(path) => return self.history.iter().map(|b| b.0.clone()).collect(),
                 Some((_, Item::Folder { path, .. })) => return vec![path.clone()],
                 Some((i, Item::Group { .. })) => {
                     return self.items[i + 1..]
@@ -661,7 +704,11 @@ impl FolderTree {
         let s = p.search;
         pen.b.fill(s.x, s.y, s.w, s.h, line);
         pen.b.fill(s.x + 1, s.y + 1, s.w - 2, s.h - 2, c.normal_bg);
-        let path = if self.showing_bookmarks() { "Bookmarks".to_string() } else { self.dir.as_ref().map(|d| d.to_string_lossy().into_owned()).unwrap_or_default() };
+        let path = if self.showing_bookmarks() {
+            "Bookmarks".to_string()
+        } else if self.showing_history() {
+            "History".to_string()
+        } else { self.dir.as_ref().map(|d| d.to_string_lossy().into_owned()).unwrap_or_default() };
         pen.left(rect(s.x + 1, s.y + 1, s.w - 2, s.h - 2), &path, dim);
 
         self.draw_entries(&mut pen, &p, c, active, playing);

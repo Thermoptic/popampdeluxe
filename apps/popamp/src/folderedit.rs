@@ -18,6 +18,8 @@ pub struct FolderEditor {
     path: usize,
     /// The box that shows or hides the Bookmarks folder.
     bookmarks: usize,
+    /// The box that shows or hides the History folder.
+    history: usize,
     /// The groups and folders being edited; they replace the tree on OK.
     pub(crate) items: Vec<Item>,
     /// The row whose name and path the two fields hold.
@@ -158,10 +160,14 @@ impl FolderEditor {
             Rect::new(10, by, 230, 24),
             Widget::Check { label: "Show Bookmarks folder".into(), checked: shown, action: Act::ShowBookmarks },
         );
+        let history = form.add(
+            Rect::new(250, by, 140, 24),
+            Widget::Check { label: "Show History folder".into(), checked: model.library.tree.items.iter().any(Item::is_history), action: Act::ShowHistory },
+        );
         button(&mut form, WIDTH - 2 * BUTTON.0 - 16, by, "OK", Act::Ok, true);
         button(&mut form, WIDTH - BUTTON.0 - 10, by, "Cancel", Act::Close, false);
         form.h = by + BUTTON.1 + 10;
-        let mut editor = FolderEditor { form, list, name, path, bookmarks, items: model.library.tree.items.clone(), shown: None, held: None };
+        let mut editor = FolderEditor { form, list, name, path, bookmarks, history, items: model.library.tree.items.clone(), shown: None, held: None };
         let first = editor.items.iter().position(Item::is_folder).or(if editor.items.is_empty() { None } else { Some(0) });
         editor.refresh(first);
         editor.load(first);
@@ -174,7 +180,13 @@ impl FolderEditor {
             Item::Group { name, .. } => format!("[{name}]"),
             Item::Folder { path, child, .. } => {
                 let indent = if *child { "     " } else { "" };
-                let place = if crate::foldertree::is_bookmarks(path) { "(your bookmarks)" } else { path };
+                let place = if crate::foldertree::is_bookmarks(path) {
+                    "(your bookmarks)"
+                } else if crate::foldertree::is_history(path) {
+                    "(what you played lately)"
+                } else {
+                    path
+                };
                 format!("{indent}{}   {place}", items[k].label())
             }
         }
@@ -184,6 +196,7 @@ impl FolderEditor {
     fn refresh(&mut self, select: Option<usize>) {
         let shown = self.items.iter().any(Item::is_bookmarks);
         self.form.set_checked(self.bookmarks, shown);
+        self.form.set_checked(self.history, self.items.iter().any(Item::is_history));
         let rows = (0..self.items.len()).map(|k| Self::row_text(&self.items, k)).collect();
         self.form.set_rows(self.list, rows, select);
     }
@@ -194,6 +207,7 @@ impl FolderEditor {
         let (name, path) = match self.shown.map(|k| &self.items[k]) {
             Some(it @ Item::Group { .. }) => (it.label(), String::new()),
             Some(it @ Item::Folder { .. }) if it.is_bookmarks() => (it.label(), String::from("(the players bookmarks)")),
+            Some(it @ Item::Folder { .. }) if it.is_history() => (it.label(), String::from("(the players history)")),
             Some(it @ Item::Folder { path, .. }) => (it.label(), path.clone()),
             None => (String::new(), String::new()),
         };
@@ -212,8 +226,8 @@ impl FolderEditor {
                 }
             }
             Item::Folder { path: old_path, name: old, .. } => {
-                // The Bookmarks folder has no path to change.
-                if !crate::foldertree::is_bookmarks(old_path) {
+                // Bookmarks and History have no path to change.
+                if !crate::foldertree::is_virtual(old_path) {
                     *old_path = path;
                 }
                 let own = crate::foldertree::path_label(old_path);
@@ -252,6 +266,20 @@ impl FolderEditor {
                     self.picked(at);
                 } else if !on {
                     self.items.retain(|i| !i.is_bookmarks());
+                    normalize(&mut self.items);
+                    let k = self.selected().unwrap_or(0).min(self.items.len().saturating_sub(1));
+                    self.refresh((!self.items.is_empty()).then_some(k));
+                    self.load((!self.items.is_empty()).then_some(k));
+                }
+            }
+            Event::Toggled(Act::ShowHistory, on) => {
+                self.commit();
+                if on && !self.items.iter().any(Item::is_history) {
+                    let at = self.items.len();
+                    self.items.push(Item::Folder { path: crate::foldertree::HISTORY.into(), name: "History".into(), child: false });
+                    self.picked(at);
+                } else if !on {
+                    self.items.retain(|i| !i.is_history());
                     normalize(&mut self.items);
                     let k = self.selected().unwrap_or(0).min(self.items.len().saturating_sub(1));
                     self.refresh((!self.items.is_empty()).then_some(k));
@@ -477,6 +505,30 @@ mod tests {
         assert!(!e.items.iter().any(Item::is_bookmarks));
         assert!(!e.handle(Event::Clicked(Act::Ok), &mut m));
         assert!(!m.library.tree.items.iter().any(Item::is_bookmarks), "hidden again");
+    }
+
+    #[test]
+    fn the_show_history_box_puts_the_history_folder_in_the_list_and_it_lists_the_plays() {
+        use crate::panels::{Panel, PanelKind};
+        let mut m = Model::for_tests();
+        m.library.tree.set_items(sample());
+        let mut p = Panel::open(PanelKind::FolderEditor, &m);
+        let Panel::Folders(e) = &mut p else { panic!() };
+        assert!(e.handle(Event::Toggled(Act::ShowHistory, true), &mut m));
+        assert!(e.items.last().is_some_and(Item::is_history));
+        assert!(!e.handle(Event::Clicked(Act::Ok), &mut m));
+        assert!(m.library.tree.items.iter().any(Item::is_history));
+        assert_eq!(m.config.folder_tree().map(|l| l.iter().any(|x| x.ends_with("|popamp:history"))), Some(true));
+        m.library.tree.set_history(vec![("/m/b.mp3".into(), "B".into()), ("/m/a.mp3".into(), "A".into())]);
+        let last = m.library.tree.items.len() - 1;
+        m.library.tree.set_items(vec![m.library.tree.items[last].clone()]);
+        m.library.tree.set_history(vec![("/m/b.mp3".into(), "B".into()), ("/m/a.mp3".into(), "A".into())]);
+        assert_eq!(m.library.tree.jump_rows().len(), 2, "the plays are in the folder");
+        let mut p = Panel::open(PanelKind::FolderEditor, &m);
+        let Panel::Folders(e) = &mut p else { panic!() };
+        assert!(matches!(e.form.widget(e.history), Widget::Check { checked: true, .. }));
+        assert!(e.handle(Event::Toggled(Act::ShowHistory, false), &mut m));
+        assert!(!e.items.iter().any(Item::is_history));
     }
 
     #[test]
