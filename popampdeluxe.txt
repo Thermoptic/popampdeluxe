@@ -38,13 +38,25 @@
        closes the list.
      * Pick "Original" to go back to the skin's own colours.
 
-  The skin files are not changed. Popamp lays the palette's colours over the
-  skin's own: dark parts of the skin get the palette's dark colours, light
-  parts its light ones, and the faintly bluish parts take a little of the
-  palette's accent. It works with vector skins (.psz and the built-in
-  skin). A classic .wsz skin is pictures and keeps its colours. Parts of a
-  skin that are drawn in a fixed colour, such as a gold edge, stay as they
-  are. The choice is kept in popamp.ini (skin_palette).
+  The skin files are not changed. Popamp recolours every colour of the skin
+  with the palette's:
+
+     * Greys: the dark parts of the skin get the palette's dark colours,
+       the light parts its light ones.
+     * Coloured parts, such as the sliders of the main window and the
+       equalizer, the volume and balance bars and the gold edges: each
+       becomes the palette's accent nearest in colour (red, orange, yellow,
+       green, cyan, blue, purple, brown), as light or dark as it was.
+     * A little colour in a grey, such as bluish metal, takes a little of
+       the palette's accent.
+     * Text: all of it is one colour, the palette's text colour. The
+       playlist and the Media Library, the scrolling title and the clock in
+       the main window are the same. The track playing in a list is the
+       palette's lightest colour.
+
+  It works with vector skins (.psz and the built-in skin). A classic .wsz
+  skin is pictures and keeps its colours. The choice is kept in popamp.ini
+  (skin_palette).
 
 
   2026-11-22   PAUSE AND RESUME ACROSS A RESTART

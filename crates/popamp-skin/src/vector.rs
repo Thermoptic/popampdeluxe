@@ -45,7 +45,7 @@ pub(crate) fn load_onto(
     if let Some(scheme) = scheme {
         palette.recolour(scheme);
     }
-    let mut build = Builder { text, files, skin: base, svg_ids: HashMap::new(), css: palette.css(), palette };
+    let mut build = Builder { text, files, skin: base, svg_ids: HashMap::new(), css: palette.css(), palette, ink: false };
     build.skin.name = file.meta.name.clone();
     build.skin.color_sets = build.palette.sets.clone();
     build.skin.color_set = build.palette.chosen;
@@ -432,6 +432,8 @@ struct Builder<'a> {
     palette: Palette,
     /// The colour set as a style sheet for the pictures.
     css: Option<String>,
+    /// The sheet being read holds letters or digits: its light colour is the text colour.
+    ink: bool,
 }
 
 impl Builder<'_> {
@@ -442,7 +444,11 @@ impl Builder<'_> {
                 let names: Vec<_> = Sheet::all().into_iter().map(Sheet::name).collect();
                 fail(format!("unknown sheet `{name}`; it can be one of: {}", names.join(", ")))
             })?;
-            let (id, (w, h)) = self.svg(file.get_ref()).map_err(fail)?;
+            // The sheets of letters and digits take the scheme's colour for text.
+            self.ink = matches!(sheet, Sheet::Text | Sheet::Numbers | Sheet::NumsEx);
+            let read = self.svg(file.get_ref());
+            self.ink = false;
+            let (id, (w, h)) = read.map_err(fail)?;
             self.skin.sheet_svgs.insert(sheet, id);
             // The x1 picture too, for what reads sheet pixels directly.
             if let Some(r) = self.skin.svgs.raster(id, Rect { x: 0, y: 0, w, h }, w, h) {
@@ -498,6 +504,18 @@ impl Builder<'_> {
         if let Some(vis) = &file.vis {
             for (i, c) in vis.colors.iter().enumerate() {
                 self.skin.viscolor[i] = self.color(c)?;
+            }
+        }
+        // With a scheme all the skin's text is one colour: the lists, the title and the clock.
+        if let Some((scheme, lo, hi)) = self.palette.scheme() {
+            self.skin.pl.normal = scheme.text();
+            self.skin.pl.current = scheme.bright();
+            if file.playlist.is_none() {
+                self.skin.pl.normal_bg = scheme.map(self.skin.pl.normal_bg, lo, hi);
+                self.skin.pl.selected_bg = scheme.map(self.skin.pl.selected_bg, lo, hi);
+            }
+            for style in [&mut self.skin.text, &mut self.skin.clock].into_iter().flatten() {
+                style.color = scheme.text();
             }
         }
         Ok(())
@@ -728,7 +746,12 @@ impl Builder<'_> {
             Some(&id) => id,
             None => {
                 let data = self.files.get(file).ok_or_else(|| format!("no file `{file}` in the skin"))?;
-                let id = self.skin.svgs.add(data, self.css.as_deref()).map_err(|e| format!("{file}: {e}"))?;
+                // With a scheme every colour written in the picture is recoloured, not only those the set names.
+                let recoloured = self.palette.scheme().and_then(|(scheme, lo, hi)| {
+                    let text = std::str::from_utf8(data).ok()?;
+                    Some(scheme.recolour_svg(text, lo, hi, self.ink).into_bytes())
+                });
+                let id = self.skin.svgs.add(recoloured.as_deref().unwrap_or(data), self.css.as_deref()).map_err(|e| format!("{file}: {e}"))?;
                 self.svg_ids.insert(file.to_string(), id);
                 id
             }

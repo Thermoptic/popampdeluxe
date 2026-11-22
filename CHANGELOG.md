@@ -13,10 +13,15 @@ All notable changes to this project are documented here. The format follows
   Tokyo Night and more, from tinted-theming/schemes). Pick one with the mouse, or open the list and
   walk through it with the arrow keys (the wheel works too): each is on in the player at once.
   It recolours any vector skin (`.psz` and the built-in one) without any change to the skin's
-  files: every colour of the skin's colour set is replaced by the scheme's colour at the same
-  lightness, and a faint tint takes a little of the scheme's accent. *Original* gives the skin's
-  own colours back. A classic `.wsz` skin keeps its colours. Kept in `popamp.ini` (`skin_palette`).
-  A drop-down with many options shows ten at a time.
+  files, and all of it: every colour written in the skin's pictures, so the sliders, the volume
+  and balance bars, the equalizer's sliders and buttons and the edges change too, not only the
+  colour set. A grey becomes the scheme's colour at the same lightness; a coloured part (a gold
+  edge, a green or red slider) becomes the scheme's accent nearest in hue, as light or dark as it
+  was; a little colour in a grey takes a little accent. The text is one colour, the scheme's text
+  colour (base05): in the playlist and the Media Library, in the scrolling title and the clock of
+  the main window; the playing track in the lists is the scheme's lightest. *Original* gives the
+  skin's own colours back. A classic `.wsz` skin keeps its colours. Kept in `popamp.ini`
+  (`skin_palette`). A drop-down with many options shows ten at a time.
 - **Pause and resume across a restart.** Popamp starts as it was closed: the playlist and the
   track that was current are back, but nothing plays. If a track was playing or paused when
   you closed it, the first Play goes on from where it was (not if another track is played

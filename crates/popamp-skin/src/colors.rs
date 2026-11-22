@@ -69,6 +69,12 @@ impl Palette {
         self.scheme = Some((*scheme, if lo <= hi { lo } else { 0.0 }, if lo <= hi { hi } else { 1.0 }));
     }
 
+    /// The scheme the colours were recoloured with, and the range of the set's
+    /// colours it was laid on.
+    pub fn scheme(&self) -> Option<(crate::base16::Scheme, f32, f32)> {
+        self.scheme
+    }
+
     /// A colour written `#rrggbb` or by its name in the sets.
     pub fn color(&self, word: &str) -> Result<u32, String> {
         // A colour written out is recoloured; a named one is already.
