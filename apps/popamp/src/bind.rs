@@ -94,7 +94,7 @@ pub fn text(model: &Model, t: Text) -> Option<String> {
             };
             format!("{shown:>6}")
         }),
-        Text::LibraryTitle => Some("MEDIA LIBRARY".into()),
+        Text::LibraryTitle => Some(model.bar_title.clone().unwrap_or_else(|| "MEDIA LIBRARY".into())),
         Text::LibraryStatus => Some(model.library.status().to_uppercase()),
     }
 }

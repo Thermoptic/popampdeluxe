@@ -833,7 +833,7 @@ impl App {
         let (cx, cy) = monitor.map_or((640, 400), |m| (m.x + m.w / 2, m.y + m.h / 2));
         let (uw, uh) = (platform::from_drawn(w, pct), platform::from_drawn(h, pct));
         // The dialogs have the skin's own title bar, the library's windowshade strip.
-        let bar = self.skin_bar(panel.form().w, pct);
+        let bar = self.skin_bar(panel.form().w, pct, panel.bar_title());
         let bar_h = bar.as_ref().map_or(0, |b| crate::pen::dialog(pct, b.h));
         let h = h + bar.as_ref().map_or(0, |b| b.h);
         let attrs = platform::attributes(WindowRole::Dialog)
@@ -882,9 +882,10 @@ impl App {
     /// The skin's windowshade strip as the title bar of a dialog `w` wide,
     /// drawn at `pct`, or none when the skin has no library window or the
     /// dialog has none of this kind.
-    fn skin_bar(&mut self, w: i32, pct: i32) -> Option<Bitmap> {
+    fn skin_bar(&mut self, w: i32, pct: i32, title: Option<&str>) -> Option<Bitmap> {
         self.model.skin.layout.window(WindowKey::Library)?;
         let (shaded, width) = (self.model.settings().ml_ws, self.model.settings().ml_width);
+        self.model.bar_title = title.map(str::to_uppercase);
         self.model.settings_mut().ml_ws = true;
         self.model.settings_mut().ml_width = w;
         let (_, h) = crate::bind::window_size(&self.model, WindowKey::Library);
@@ -895,6 +896,7 @@ impl App {
         }
         self.model.settings_mut().ml_ws = shaded;
         self.model.settings_mut().ml_width = width;
+        self.model.bar_title = None;
         (h > 0).then_some(bar)
     }
 
@@ -904,7 +906,8 @@ impl App {
         let bar_wanted = p.bar_h > 0;
         let form_w = p.panel.form().w;
         let bar_pct = if platform::DESKTOP_IN_POINTS { ((p.window.scale_factor() * 100.0).round() as i32).max(100) } else { main_pct };
-        let bar = if bar_wanted { self.skin_bar(form_w, bar_pct) } else { None };
+        let title = p.panel.bar_title();
+        let bar = if bar_wanted { self.skin_bar(form_w, bar_pct, title) } else { None };
         let Some(p) = self.panels.get_mut(i) else { return };
         // A dialog dragged to another screen is drawn at that screen's density.
         let pct = if platform::DESKTOP_IN_POINTS { ((p.window.scale_factor() * 100.0).round() as i32).max(100) } else { main_pct };

@@ -152,6 +152,11 @@ impl Panel {
         }
     }
 
+    /// What the skin's title bar says instead of "Media Library", for the dialogs that name themselves there.
+    pub fn bar_title(&self) -> Option<&'static str> {
+        matches!(self, Panel::Folders(_)).then(|| self.title())
+    }
+
     pub fn title(&self) -> &'static str {
         match self {
             Panel::Jump(_) => "Jump to file",

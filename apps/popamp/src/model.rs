@@ -131,6 +131,8 @@ pub struct Model {
     pub bookmarks: Vec<Item>,
     /// What was played, kept in `history.txt`.
     pub history: History,
+    /// What the library's title bar says in a dialog that has a title of its own.
+    pub bar_title: Option<String>,
     /// The ReplayGain values Popamp measured, kept in `replaygain.txt`.
     pub scanned: Arc<Scanned>,
     /// Where the ReplayGain scan is; its window shows it.
@@ -305,6 +307,7 @@ impl Model {
             eq_auto,
             bookmarks,
             history,
+            bar_title: None,
             scanned,
             scan: Default::default(),
             vis: Vis::new(),
