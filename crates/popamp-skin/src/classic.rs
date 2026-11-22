@@ -458,7 +458,7 @@ fn playlist_shade() -> Mode {
 fn shade_bar(shade: Command, close: Command, title: Option<Text>) -> Mode {
     let mut v = vec![
         piece(Start(0), Start(0), pair_look(p::SHADE_LEFT), 25, 14),
-        tiles(span(Start(25), Start(0), End(-50), Start(14)), p::SHADE_TILE),
+        Element::new(span(Start(25), Start(0), End(-50), Start(14)), Kind::Image { look: pair_look(p::SHADE_TILE), fill: Fill::Tile, lit: None }),
         piece(End(-50), Start(0), pair_look(p::SHADE_RIGHT), 50, 14),
         Element::new(span(Start(0), Start(0), End(0), Start(14)), Kind::Drag { double: Some(shade) }),
         button(span(End(-21), Start(3), End(-12), Start(12)), pl_overlay(p::SHADE_PRESSED), Action::click(shade)).cursor(C::PWinBut),
