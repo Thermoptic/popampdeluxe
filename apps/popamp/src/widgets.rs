@@ -123,6 +123,8 @@ pub enum Event<A> {
 }
 
 pub const ROW_H: i32 = 18;
+/// The most options an open drop-down shows at once; a longer list scrolls with the pick.
+const DROP_ROWS: usize = 10;
 pub const BUTTON: (i32, i32) = (80, 24);
 /// The height of one entry of a [`Widget::Pages`].
 pub const PAGE_H: i32 = 24;
@@ -267,6 +269,14 @@ impl<A: Copy + PartialEq> Form<A> {
     /// The wheel at `(x, y)`: over a number it changes the number (up: more),
     /// else it scrolls the list.
     pub fn wheel_at(&mut self, x: i32, y: i32, steps: i32) -> Event<A> {
+        // Over the options of an open drop-down the wheel steps through them.
+        if let Some(i) = self.open.filter(|&i| self.shown(i)) {
+            if self.dropdown(i).contains(x, y) {
+                let now = self.choice(i) as i64;
+                self.set_choice(i, (now - i64::from(steps).signum()).max(0) as usize);
+                return Event::Selected;
+            }
+        }
         let over = self.numbers.iter().map(|n| n.0).find(|&i| self.shown(i) && self.controls[i].0.contains(x, y));
         match over {
             Some(i) => self.bump(i, i64::from(steps)),
@@ -388,7 +398,7 @@ impl<A: Copy + PartialEq> Form<A> {
     fn dropdown(&self, i: usize) -> Rect {
         let r = self.controls[i].0;
         let n = match &self.controls[i].1 {
-            Widget::Choice { options, .. } => options.len() as i32,
+            Widget::Choice { options, .. } => options.len().min(DROP_ROWS) as i32,
             _ => 0,
         };
         let h = n * ROW_H + 4;
@@ -405,9 +415,17 @@ impl<A: Copy + PartialEq> Form<A> {
         if !list.contains(x, y) {
             return Event::None;
         }
-        let row = ((y - list.y - 2) / ROW_H).max(0) as usize;
+        let row = self.drop_start(i) + ((y - list.y - 2) / ROW_H).max(0) as usize;
         self.set_choice(i, row);
         Event::Selected
+    }
+
+    /// The first option of drop-down `i` that shows when it is open: a long
+    /// list is shown a window at a time, the pick in the middle of it.
+    fn drop_start(&self, i: usize) -> usize {
+        let Widget::Choice { options, selected } = &self.controls[i].1 else { return 0 };
+        let shown = options.len().min(DROP_ROWS);
+        selected.saturating_sub(shown / 2).min(options.len() - shown)
     }
 
     /// Ticks or clears check box `i`, as a click would, without an event.
@@ -650,7 +668,7 @@ impl<A: Copy + PartialEq> Form<A> {
         // The options of an open drop-down go over what is below it.
         if let Some(i) = self.open.filter(|&i| self.shown(i)) {
             if let Widget::Choice { options, selected } = &self.controls[i].1 {
-                draw_options(pen, self.dropdown(i), options, *selected);
+                draw_options(pen, self.dropdown(i), options, *selected, self.drop_start(i));
             }
         }
     }
@@ -783,10 +801,12 @@ fn draw_choice(pen: &mut Pen, r: Rect, text: &str, open: bool) {
     }
 }
 
-fn draw_options(pen: &mut Pen, r: Rect, options: &[String], selected: usize) {
+fn draw_options(pen: &mut Pen, r: Rect, options: &[String], selected: usize, start: usize) {
     sunken(pen, r, true);
-    for (n, option) in options.iter().enumerate() {
-        let y = r.y + 2 + n as i32 * ROW_H;
+    let shown = (options.len()).min(DROP_ROWS);
+    for (row, option) in options.iter().enumerate().skip(start).take(shown) {
+        let n = row;
+        let y = r.y + 2 + (row - start) as i32 * ROW_H;
         if n == selected {
             pen.fill(r.x + 2, y, r.w - 4, ROW_H, HILITE);
         }

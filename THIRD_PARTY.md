@@ -30,6 +30,14 @@ contributors, MIT OR Apache-2.0.
 | `MainWin::tooltip`, tooltip timing in `app.rs` | the tooltip texts, the 0.6 s delay and 7 s timeout (`src/ui/main_win.rs`, `src/app.rs`) |
 | `packaging/build-deb.sh`, `packaging/build-appimage.sh`, `.github/workflows/release.yml` | the package scripts and the release workflow, including the pinned appimagetool checksums (`packaging/linux/`, `.github/workflows/release.yml`) |
 
+## Base16 colour schemes
+
+The forty dark colour schemes in `crates/popamp-skin/src/base16.rs` (the
+Skin Browser's *Palette* list) are from the Base16 collection of
+[tinted-theming/schemes](https://github.com/tinted-theming/schemes), under
+the MIT licence. Each scheme is the work of its own author, named in the
+collection; only the sixteen colours of each are kept here.
+
 ## Shipped with the Windows downloads
 
 The Linux packages take these from the system (the AppImage carries its

@@ -275,7 +275,7 @@ impl Model {
         library.tree.set_bookmarks(bookmarks.iter().map(|b| (b.location.clone(), bookmark_label(b))).collect());
         // The window as it was left: the folder, the place in it, the order.
         library.restore(&|key| config.state(key).map(String::from));
-        let skin = Skin::builtin_vector(Some(&config.settings.skin_colors));
+        let skin = Skin::builtin_vector_with(Some(&config.settings.skin_colors), popamp_skin::base16::find(&config.settings.skin_palette));
         let keymap = crate::keymap::Keymap::load(|id| config.hotkey(id));
         let mut m = Model {
             keymap,
@@ -952,12 +952,28 @@ impl Model {
 
     /// The built-in skin with the colour set the user picked.
     fn builtin_skin(&self) -> Skin {
-        Skin::builtin_vector(Some(&self.settings().skin_colors))
+        Skin::builtin_vector_with(Some(&self.settings().skin_colors), popamp_skin::base16::find(&self.settings().skin_palette))
+    }
+
+    /// Recolours the skin with Base16 scheme `id` (empty: its own colours)
+    /// and shows it at once.
+    pub fn set_palette(&mut self, id: &str) {
+        if self.settings().skin_palette == id {
+            return;
+        }
+        self.settings_mut().skin_palette = id.to_string();
+        match self.skin_path.clone() {
+            Some(path) => self.reload_skin(&path),
+            None => {
+                self.skin = self.builtin_skin();
+                self.ui.push(UiReq::SkinChanged);
+            }
+        }
     }
 
     /// Loads the skin with the colour set the user picked.
     pub fn load_skin(&self, path: &std::path::Path) -> Result<Skin, String> {
-        Skin::load(path, Some(&self.settings().skin_colors))
+        Skin::load_with(path, Some(&self.settings().skin_colors), popamp_skin::base16::find(&self.settings().skin_palette))
     }
 
     fn reload_skin(&mut self, path: &std::path::Path) {

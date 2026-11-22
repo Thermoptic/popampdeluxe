@@ -294,6 +294,9 @@ settings! {
     /// The colour set wanted of a skin that has several, by name; a skin
     /// without a set of this name shows its first.
     skin_colors: String = String::new(),
+    /// The Base16 scheme that recolours a vector skin (its id in the
+    /// collection, `popamp_skin::base16`); empty: the skin's own colours.
+    skin_palette: String = String::new(),
     usecursors: bool = true,
     /// Draw the text of the player (the playlist, the library, menus and
     /// dialogs, and a vector skin's texts) with `font_file`.

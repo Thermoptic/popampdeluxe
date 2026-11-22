@@ -23,6 +23,9 @@ pub struct Palette {
     /// Which of `sets` is in use.
     pub chosen: usize,
     colors: HashMap<String, u32>,
+    /// A Base16 scheme and the range of the set's colours it was laid on: a colour
+    /// written out as `#rrggbb` in the skin's file is recoloured the same way.
+    scheme: Option<(crate::base16::Scheme, f32, f32)>,
 }
 
 impl Palette {
@@ -48,12 +51,29 @@ impl Palette {
                 }
             }
         }
-        Ok(Palette { sets, chosen, colors })
+        Ok(Palette { sets, chosen, colors, scheme: None })
+    }
+
+    /// Gives every colour of the set in use the colour of `scheme` that sits
+    /// where it sat between the set's darkest and lightest.
+    pub fn recolour(&mut self, scheme: &crate::base16::Scheme) {
+        let (mut lo, mut hi) = (f32::MAX, f32::MIN);
+        for c in self.colors.values() {
+            let y = crate::base16::luma(*c);
+            (lo, hi) = (lo.min(y), hi.max(y));
+        }
+        for c in self.colors.values_mut() {
+            *c = scheme.map(*c, lo, hi);
+        }
+        // A skin without sets has no range of its own: the whole scale.
+        self.scheme = Some((*scheme, if lo <= hi { lo } else { 0.0 }, if lo <= hi { hi } else { 1.0 }));
     }
 
     /// A colour written `#rrggbb` or by its name in the sets.
     pub fn color(&self, word: &str) -> Result<u32, String> {
-        match hex(word).or_else(|| self.colors.get(word).copied()) {
+        // A colour written out is recoloured; a named one is already.
+        let written = hex(word).map(|c| self.scheme.map_or(c, |(scheme, lo, hi)| scheme.map(c, lo, hi)));
+        match written.or_else(|| self.colors.get(word).copied()) {
             Some(c) => Ok(c),
             None if self.colors.is_empty() => Err(not_a_colour(word)),
             None => Err(format!("{} or use one of the skin's colours: {}", not_a_colour(word), self.names().join(", "))),

@@ -8,6 +8,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Palettes in the Skin Browser:** a drop-down *Palette* with *Original* at the top and forty dark
+  Base16 schemes (Gruvbox, Solarized, Nord, Monokai, Tomorrow Night, One Dark, Catppuccin, Dracula,
+  Tokyo Night and more, from tinted-theming/schemes). Pick one with the mouse, or open the list and
+  walk through it with the arrow keys (the wheel works too): each is on in the player at once.
+  It recolours any vector skin (`.psz` and the built-in one) without any change to the skin's
+  files: every colour of the skin's colour set is replaced by the scheme's colour at the same
+  lightness, and a faint tint takes a little of the scheme's accent. *Original* gives the skin's
+  own colours back. A classic `.wsz` skin keeps its colours. Kept in `popamp.ini` (`skin_palette`).
+  A drop-down with many options shows ten at a time.
 - **Pause and resume across a restart.** Popamp starts as it was closed: the playlist and the
   track that was current are back, but nothing plays. If a track was playing or paused when
   you closed it, the first Play goes on from where it was (not if another track is played

@@ -3,6 +3,7 @@
 
 pub mod bitmap;
 mod classic;
+pub mod base16;
 mod colors;
 pub mod cursors;
 pub mod layout;
@@ -57,10 +58,15 @@ impl Skin {
     /// (by name; its first set when it has none of that name). The player's
     /// default skin, and where every other skin takes what it leaves out.
     pub fn builtin_vector(colors: Option<&str>) -> Skin {
+        Skin::builtin_vector_with(colors, None)
+    }
+
+    /// As [`Skin::builtin_vector`], with every colour taken from `scheme`.
+    pub fn builtin_vector_with(colors: Option<&str>, scheme: Option<&base16::Scheme>) -> Skin {
         // The vector skin of the popamp-skin-default repository, built in.
         let files = popamp_skin_default::FILES.iter().map(|(name, data)| (name.to_string(), data.to_vec())).collect();
         // The files are part of the program; a test loads them.
-        vector::load_onto(Skin::bare(), &files, colors).expect("the built-in skin loads")
+        vector::load_onto(Skin::bare(), &files, colors, scheme).expect("the built-in skin loads")
     }
 
     /// The built-in skin as x1 bitmaps, for classic skins to fall back on.
@@ -138,9 +144,17 @@ impl Skin {
     /// wanted of a vector skin that has several; its first is used when it
     /// has none of that name.
     pub fn load(path: &Path, colors: Option<&str>) -> Result<Skin, String> {
+        Skin::load_with(path, colors, None)
+    }
+
+    /// As [`Skin::load`], with every colour of a vector skin taken from
+    /// `scheme`. A classic skin is bitmaps and keeps its colours.
+    pub fn load_with(path: &Path, colors: Option<&str>, scheme: Option<&base16::Scheme>) -> Result<Skin, String> {
         let read = |key: Key| if path.is_dir() { read_dir_files(path, key) } else { read_zip_files(path, key) };
         if is_vector(path) {
-            return read(vector_key).and_then(|files| vector::load(&files, colors)).map_err(|e| format!("{}: {e}", path.display()));
+            return read(vector_key)
+                .and_then(|files| vector::load_with(&files, colors, scheme))
+                .map_err(|e| format!("{}: {e}", path.display()));
         }
         let name = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
         Ok(Self::from_files(name, &read(classic_key)?))

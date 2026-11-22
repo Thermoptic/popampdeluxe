@@ -22,16 +22,29 @@ const FORMAT_VERSION: u32 = 1;
 /// the file leaves out come from the built-in skin.
 /// `colors` is the colour set wanted, by name.
 pub fn load(files: &HashMap<String, Vec<u8>>, colors: Option<&str>) -> Result<Skin, String> {
-    load_onto(Skin::builtin_vector(None), files, colors)
+    load_with(files, colors, None)
+}
+
+/// As [`load`], with every colour of the skin replaced from `scheme`.
+pub fn load_with(files: &HashMap<String, Vec<u8>>, colors: Option<&str>, scheme: Option<&crate::base16::Scheme>) -> Result<Skin, String> {
+    load_onto(Skin::builtin_vector(None), files, colors, scheme)
 }
 
 /// Builds a skin over `base`, which gives what the file leaves out.
-pub(crate) fn load_onto(base: Skin, files: &HashMap<String, Vec<u8>>, colors: Option<&str>) -> Result<Skin, String> {
+pub(crate) fn load_onto(
+    base: Skin,
+    files: &HashMap<String, Vec<u8>>,
+    colors: Option<&str>,
+    scheme: Option<&crate::base16::Scheme>,
+) -> Result<Skin, String> {
     let text = files.get(FILE).ok_or(format!("no {FILE}"))?;
     let text = std::str::from_utf8(text).map_err(|e| format!("{FILE}: not UTF-8 text: {e}"))?;
     check_head(text)?;
     let file: SkinFile = toml::from_str(text).map_err(|e| at(text, e.span(), e.message()))?;
-    let palette = Palette::read(&file.colors, colors).map_err(|(span, msg)| at(text, Some(span), &msg))?;
+    let mut palette = Palette::read(&file.colors, colors).map_err(|(span, msg)| at(text, Some(span), &msg))?;
+    if let Some(scheme) = scheme {
+        palette.recolour(scheme);
+    }
     let mut build = Builder { text, files, skin: base, svg_ids: HashMap::new(), css: palette.css(), palette };
     build.skin.name = file.meta.name.clone();
     build.skin.color_sets = build.palette.sets.clone();

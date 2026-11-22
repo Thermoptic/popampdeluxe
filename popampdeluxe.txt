@@ -21,6 +21,32 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-22   PALETTES IN THE SKIN BROWSER
+  ..........................................................................
+
+  Skin Browser (Alt+S) > Palette
+
+  Under the list of skins there is a drop-down called Palette. The top
+  choice is "Original", the skin as its maker coloured it. Under it are
+  forty dark colour palettes from the Base16 collection, such as Gruvbox,
+  Solarized Dark, Nord, Monokai, Tomorrow Night, One Dark, Catppuccin,
+  Dracula and Tokyo Night.
+
+     * Click the drop-down and click a palette, or open it and move with the
+       Up and Down arrow keys (or the mouse wheel). Each palette you pass
+       is on in the player at once, so you see the colours as you go. Enter
+       closes the list.
+     * Pick "Original" to go back to the skin's own colours.
+
+  The skin files are not changed. Popamp lays the palette's colours over the
+  skin's own: dark parts of the skin get the palette's dark colours, light
+  parts its light ones, and the faintly bluish parts take a little of the
+  palette's accent. It works with vector skins (.psz and the built-in
+  skin). A classic .wsz skin is pictures and keeps its colours. Parts of a
+  skin that are drawn in a fixed colour, such as a gold edge, stay as they
+  are. The choice is kept in popamp.ini (skin_palette).
+
+
   2026-11-22   PAUSE AND RESUME ACROSS A RESTART
   ..........................................................................
 

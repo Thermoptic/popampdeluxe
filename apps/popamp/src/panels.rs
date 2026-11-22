@@ -1232,6 +1232,8 @@ impl Preferences {
 pub struct SkinBrowser {
     form: Form<Act>,
     list: usize,
+    /// The drop-down of Base16 palettes: the skin's own colours, then forty dark schemes.
+    palette: usize,
     /// The skin of each row after the first, the built-in one.
     skins: Vec<std::path::PathBuf>,
     /// The skin on when the rows were made.
@@ -1244,16 +1246,24 @@ pub struct SkinBrowser {
 impl SkinBrowser {
     fn new(model: &Model) -> SkinBrowser {
         let (w, list_h) = (380, 4 + 16 * ROW_H);
-        let mut form = Form::new(w, 10 + list_h + 10 + BUTTON.1 + 10);
+        let mut form = Form::new(w, 10 + list_h + 10 + 24 + 6 + 16 + 10 + BUTTON.1 + 10);
         let list = form.add(Rect::new(10, 10, w - 20, list_h), Widget::List { rows: vec![], selected: None, scroll: 0 });
-        let by = 10 + list_h + 10;
+        // Palettes: Base16 colours for a vector skin, shown in the player as they are picked.
+        let py = 10 + list_h + 10;
+        form.add(Rect::new(10, py, 64, 24), Widget::Label { text: "Palette:".into(), dim: false });
+        let options: Vec<String> =
+            std::iter::once("Original".to_string()).chain(popamp_skin::base16::SCHEMES.iter().map(|s| s.name.to_string())).collect();
+        let on = popamp_skin::base16::SCHEMES.iter().position(|s| s.id == model.settings().skin_palette).map_or(0, |i| i + 1);
+        let palette = form.add(Rect::new(78, py, w - 88, 24), Widget::Choice { options, selected: on });
+        form.add(Rect::new(78, py + 28, w - 88, 16), Widget::Label { text: "For .psz skins; a .wsz skin keeps its colours.".into(), dim: true });
+        let by = py + 24 + 6 + 16 + 10;
         form.add(
             Rect::new(10, by, 120, BUTTON.1),
             Widget::Button { label: "Install from file…".into(), action: Act::InstallSkin, default: false },
         );
         form.add(Rect::new(136, by, BUTTON.0, BUTTON.1), Widget::Button { label: "Gallery…".into(), action: Act::Gallery, default: false });
         button(&mut form, w - BUTTON.0 - 10, by, "Close", Act::Close, true);
-        let mut p = SkinBrowser { form, list, skins: vec![], current: None, scanned: std::time::Instant::now() };
+        let mut p = SkinBrowser { form, list, palette, skins: vec![], current: None, scanned: std::time::Instant::now() };
         p.relist(model);
         p
     }
@@ -1292,6 +1302,9 @@ impl SkinBrowser {
                 if skin != model.skin_path {
                     model.set_skin(skin);
                 }
+                // The palette picked (also while the drop-down is open and the arrows move in it) is on at once.
+                let id = self.form.choice(self.palette).checked_sub(1).and_then(|i| popamp_skin::base16::SCHEMES.get(i)).map_or("", |s| s.id);
+                model.set_palette(id);
                 self.current = model.skin_path.clone();
                 true
             }
@@ -1564,6 +1577,44 @@ pub(crate) mod tests {
         let Widget::List { rows, selected, .. } = b.form.widget(b.list) else { unreachable!() };
         assert_eq!(selected.map(|i| rows[i].as_str()), Some("shaped"));
         assert!(!p.refresh(&m), "nothing new");
+    }
+
+    #[test]
+    fn the_skin_browser_has_a_drop_down_of_forty_dark_palettes_that_the_arrow_keys_walk_through() {
+        use popamp_skin::base16::SCHEMES;
+        let mut m = Model::for_tests();
+        let original = m.skin.pl.normal_bg;
+        let mut p = Panel::open(PanelKind::SkinBrowser, &m);
+        let Panel::Skins(b) = &p else { panic!("not the skin browser") };
+        let choice = b.palette;
+        let Widget::Choice { options, selected } = b.form.widget(choice) else { panic!("a drop-down") };
+        assert_eq!(options.len(), 41, "Original and forty schemes");
+        assert_eq!(options[0], "Original", "the top one: no palette");
+        assert_eq!((options[1].as_str(), *selected), ("Gruvbox dark, hard", 0));
+        // Open it and walk down with the arrow keys: each step is on in the player at once.
+        let r = p.form().rect(choice);
+        click(&mut p, &mut m, r);
+        press(&mut p, &mut m, Key::Down);
+        assert_eq!(m.settings().skin_palette, SCHEMES[0].id);
+        for _ in 0..4 {
+            press(&mut p, &mut m, Key::Down);
+        }
+        assert_eq!(m.settings().skin_palette, SCHEMES[4].id, "five steps down: the fifth scheme");
+        assert_ne!(m.skin.pl.normal_bg, original, "the skin has its colours");
+        assert_eq!(m.skin.pl.normal_bg, popamp_skin::Skin::builtin_vector_with(None, Some(&SCHEMES[4])).pl.normal_bg);
+        press(&mut p, &mut m, Key::Up);
+        assert_eq!(m.settings().skin_palette, SCHEMES[3].id, "and up again");
+        // Far down the list the drop-down shows a window of it; the top one gives the colours back.
+        for _ in 0..40 {
+            press(&mut p, &mut m, Key::Down);
+        }
+        assert_eq!(m.settings().skin_palette, SCHEMES[39].id, "the last one, not past it");
+        for _ in 0..41 {
+            press(&mut p, &mut m, Key::Up);
+        }
+        assert_eq!(m.settings().skin_palette, "", "Original");
+        assert_eq!(m.skin.pl.normal_bg, original, "the skin's own colours again");
+        press(&mut p, &mut m, Key::Enter);
     }
 
     #[test]
