@@ -7,8 +7,8 @@
 
 ==============================================================================
 
-  Version ........ 1.0.1 and later
-  Updated ........ 2026-11-19
+  Version ........ 1.1.0 and later
+  Updated ........ 2026-11-22
   Project ........ https://github.com/Thermoptic/popampdeluxe
 
   This file lists the biggest changes in Popamp Deluxe, one feature at a

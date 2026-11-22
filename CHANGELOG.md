@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-22
+
 ### Added
 
 - The Folder and Group Editor has "Show History folder" beside "Show Bookmarks folder": a History folder in the Media Library's left list that shows the tracks played lately, newest first.
@@ -786,7 +788,8 @@ First release.
 - **Packaging:** desktop entry, `.wsz` MIME type, icons and a per-user
   install script.
 
-[Unreleased]: https://github.com/popamp/popamp/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/popamp/popamp/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/popamp/popamp/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/popamp/popamp/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/popamp/popamp/compare/v0.9.1...v1.0.0
 [0.9.1]: https://github.com/popamp/popamp/compare/v0.9.0...v0.9.1
