@@ -2,8 +2,14 @@
 
 ## What's new in Popamp Deluxe
 
-*Updated 2026-11-19. The same list, as a text file that comes with every
+*Updated 2026-11-22. The same list, as a text file that comes with every
 download: [popampdeluxe.txt](popampdeluxe.txt).*
+
+- **Palettes** (Skin Browser > Palette). Forty dark Base16 schemes, with *Original* at the top.
+  Pick one, or walk through the list with the arrow keys, and every vector skin is recoloured
+  in the player at once: dark base00 surfaces, base0E title-bar lines, base0B lamps, base05 text.
+
+<p align="center"><img src="assets/screenshots/palette.webp" alt="The player, equalizer and playlist in a Base16 palette"></p>
 
 - **Hotkeys** (Preferences > Hotkeys). Every keyboard shortcut is listed and can
   be changed, added to, cleared or reset. Kept in `popamp.ini`.
