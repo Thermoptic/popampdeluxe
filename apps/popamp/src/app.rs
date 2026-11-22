@@ -967,7 +967,8 @@ impl App {
             WindowEvent::CursorMoved { position, .. } => {
                 // Dialog pixels, from the top of the form; above it is the title bar.
                 p.cursor = (crate::pen::dialog(p.pct, position.x as i32), crate::pen::dialog(p.pct, position.y as i32) - p.bar_h);
-                if p.panel.mouse_drag(p.cursor.0, p.cursor.1) {
+                let dragged = p.panel.form_mut().drag(p.cursor.0, p.cursor.1);
+                if p.panel.mouse_drag(p.cursor.0, p.cursor.1) || dragged {
                     self.render_panel(i);
                 }
                 return;

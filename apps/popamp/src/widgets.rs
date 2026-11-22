@@ -125,6 +125,8 @@ pub enum Event<A> {
 pub const ROW_H: i32 = 18;
 /// The most options an open drop-down shows at once; a longer list scrolls with the pick.
 const DROP_ROWS: usize = 10;
+/// The width of the scroll bar of a long drop-down.
+const DROP_BAR: i32 = 9;
 pub const BUTTON: (i32, i32) = (80, 24);
 /// The height of one entry of a [`Widget::Pages`].
 pub const PAGE_H: i32 = 24;
@@ -151,6 +153,11 @@ pub struct Form<A> {
     pressed: Option<usize>,
     /// The drop-down whose options are showing.
     open: Option<usize>,
+    /// The first option showing in the open drop-down, once the wheel or the
+    /// scroll bar has moved the window; `None`: centred on the pick.
+    drop_top: Option<usize>,
+    /// The scroll bar's thumb held by the mouse: where on it it was taken.
+    thumb_grab: Option<i32>,
     /// The keyboard goes to a field only when the mouse (or Tab) puts it
     /// there: no caret shows until a field is clicked.
     quiet: bool,
@@ -161,7 +168,7 @@ pub struct Form<A> {
 
 impl<A: Copy + PartialEq> Form<A> {
     pub fn new(w: i32, h: i32) -> Form<A> {
-        Form { w, h, controls: Vec::new(), pages: Vec::new(), hidden: Vec::new(), page: 0, focus: None, pressed: None, open: None, quiet: false, numbers: Vec::new() }
+        Form { w, h, controls: Vec::new(), pages: Vec::new(), hidden: Vec::new(), page: 0, focus: None, pressed: None, open: None, drop_top: None, thumb_grab: None, quiet: false, numbers: Vec::new() }
     }
 
     /// Adds a control shown on every page and returns its index. The first
@@ -199,6 +206,7 @@ impl<A: Copy + PartialEq> Form<A> {
         }
         if hide && self.open == Some(i) {
             self.open = None;
+            self.drop_top = None;
         }
     }
 
@@ -272,9 +280,13 @@ impl<A: Copy + PartialEq> Form<A> {
         // Over the options of an open drop-down the wheel steps through them.
         if let Some(i) = self.open.filter(|&i| self.shown(i)) {
             if self.dropdown(i).contains(x, y) {
-                let now = self.choice(i) as i64;
-                self.set_choice(i, (now - i64::from(steps).signum()).max(0) as usize);
-                return Event::Selected;
+                // The wheel only scrolls the list; a pick is a click or an arrow.
+                let n = self.options_len(i);
+                if n > DROP_ROWS {
+                    let top = self.drop_start(i) as i64 - i64::from(steps) * 3;
+                    self.drop_top = Some(top.clamp(0, (n - DROP_ROWS) as i64) as usize);
+                }
+                return Event::None;
             }
         }
         let over = self.numbers.iter().map(|n| n.0).find(|&i| self.shown(i) && self.controls[i].0.contains(x, y));
@@ -410,14 +422,57 @@ impl<A: Copy + PartialEq> Form<A> {
     /// A press while a drop-down is open: it picks the option under the
     /// mouse, or just closes the list; either way the press is spent.
     fn press_in_open(&mut self, i: usize, x: i32, y: i32) -> Event<A> {
-        self.open = None;
         let list = self.dropdown(i);
+        let n = self.options_len(i);
+        // The scroll bar: a press on it moves the window and keeps the list
+        // open; it never picks anything.
+        if n > DROP_ROWS && list.contains(x, y) && x >= bar_track(list).x {
+            let start = self.drop_start(i);
+            let (ty, len) = bar_thumb(list, n, start);
+            if y >= ty && y < ty + len {
+                self.thumb_grab = Some(y - ty);
+            } else {
+                // On the track beside the thumb: a page up or down.
+                let top = if y < ty { start.saturating_sub(DROP_ROWS) } else { (start + DROP_ROWS).min(n - DROP_ROWS) };
+                self.drop_top = Some(top);
+            }
+            return Event::None;
+        }
+        self.open = None;
+        let top = self.drop_start(i);
+        self.drop_top = None;
         if !list.contains(x, y) {
             return Event::None;
         }
-        let row = self.drop_start(i) + ((y - list.y - 2) / ROW_H).max(0) as usize;
+        let row = top + ((y - list.y - 2) / ROW_H).max(0) as usize;
         self.set_choice(i, row);
         Event::Selected
+    }
+
+    fn options_len(&self, i: usize) -> usize {
+        match &self.controls[i].1 {
+            Widget::Choice { options, .. } => options.len(),
+            _ => 0,
+        }
+    }
+
+    /// The mouse moved to `(x, y)`: a held scroll-bar thumb follows it.
+    /// Whether the form needs drawing again.
+    pub fn drag(&mut self, _x: i32, y: i32) -> bool {
+        let (Some(grab), Some(i)) = (self.thumb_grab, self.open) else { return false };
+        let list = self.dropdown(i);
+        let n = self.options_len(i);
+        if n <= DROP_ROWS {
+            return false;
+        }
+        let track = bar_track(list);
+        let (_, len) = bar_thumb(list, n, 0);
+        let room = (track.h - len).max(1);
+        let pos = (y - grab - track.y).clamp(0, room);
+        let top = (pos as usize * (n - DROP_ROWS) + room as usize / 2) / room as usize;
+        let changed = self.drop_top != Some(top);
+        self.drop_top = Some(top);
+        changed
     }
 
     /// The first option of drop-down `i` that shows when it is open: a long
@@ -425,7 +480,8 @@ impl<A: Copy + PartialEq> Form<A> {
     fn drop_start(&self, i: usize) -> usize {
         let Widget::Choice { options, selected } = &self.controls[i].1 else { return 0 };
         let shown = options.len().min(DROP_ROWS);
-        selected.saturating_sub(shown / 2).min(options.len() - shown)
+        let centred = selected.saturating_sub(shown / 2).min(options.len() - shown);
+        self.drop_top.map_or(centred, |t| t.min(options.len() - shown))
     }
 
     /// Ticks or clears check box `i`, as a click would, without an event.
@@ -539,6 +595,7 @@ impl<A: Copy + PartialEq> Form<A> {
             Widget::Pages { .. } => self.pick_page(i, y),
             Widget::Choice { .. } => {
                 self.open = Some(i);
+                self.drop_top = None;
                 Event::None
             }
             Widget::Label { .. } | Widget::Group { .. } | Widget::Image { .. } => Event::None,
@@ -561,6 +618,7 @@ impl<A: Copy + PartialEq> Form<A> {
 
     /// A button fires when the mouse is released over it.
     pub fn mouse_up(&mut self, x: i32, y: i32) -> Event<A> {
+        self.thumb_grab = None;
         match self.pressed.take().map(|i| &self.controls[i]) {
             Some((r, Widget::Button { action, .. })) if r.contains(x, y) => Event::Clicked(*action),
             _ => Event::None,
@@ -586,12 +644,16 @@ impl<A: Copy + PartialEq> Form<A> {
                 Key::Down => 1,
                 Key::Enter | Key::Escape => {
                     self.open = None;
+                    self.drop_top = None;
                     return Event::None;
                 }
                 _ => return Event::None,
             };
             let n = (self.choice(i) as i64 + step).max(0) as usize;
             self.set_choice(i, n);
+            // Keep the pick in view, moving the window as little as it takes.
+            let (top, picked) = (self.drop_start(i), self.choice(i));
+            self.drop_top = Some(if picked < top { picked } else if picked >= top + DROP_ROWS { picked + 1 - DROP_ROWS } else { top });
             return Event::Selected;
         }
         match key {
@@ -801,17 +863,40 @@ fn draw_choice(pen: &mut Pen, r: Rect, text: &str, open: bool) {
     }
 }
 
+/// Where the scroll bar of a long drop-down's options runs.
+fn bar_track(list: Rect) -> Rect {
+    Rect::new(list.x + list.w - DROP_BAR - 2, list.y + 2, DROP_BAR, list.h - 4)
+}
+
+/// The top and length of the thumb when the options show from `start`.
+fn bar_thumb(list: Rect, n: usize, start: usize) -> (i32, i32) {
+    let track = bar_track(list);
+    let len = (track.h * DROP_ROWS as i32 / n as i32).max(12).min(track.h);
+    let room = track.h - len;
+    let span = (n - DROP_ROWS).max(1) as i32;
+    (track.y + room * start.min(n - DROP_ROWS) as i32 / span, len)
+}
+
 fn draw_options(pen: &mut Pen, r: Rect, options: &[String], selected: usize, start: usize) {
     sunken(pen, r, true);
     let shown = (options.len()).min(DROP_ROWS);
+    let long = options.len() > DROP_ROWS;
+    let text_w = if long { r.w - DROP_BAR - 6 } else { r.w - 4 };
+    if long {
+        let track = bar_track(r);
+        pen.fill(track.x, track.y, track.w, track.h, mix(BG, BORDER, 0.35));
+        let (ty, len) = bar_thumb(r, options.len(), start);
+        pen.fill(track.x, ty, track.w, len, HILITE);
+        pen.bevel(track.x, ty, track.w, len, BORDER, BORDER);
+    }
     for (row, option) in options.iter().enumerate().skip(start).take(shown) {
         let n = row;
         let y = r.y + 2 + (row - start) as i32 * ROW_H;
         if n == selected {
-            pen.fill(r.x + 2, y, r.w - 4, ROW_H, HILITE);
+            pen.fill(r.x + 2, y, text_w, ROW_H, HILITE);
         }
-        let t = pen.fit(option, r.w - 12);
-        pen.text(r.x + 5, y + (ROW_H - FONT_PX as i32) / 2 - 1, &t, TEXT, r.x + 2, r.w - 4);
+        let t = pen.fit(option, text_w - 8);
+        pen.text(r.x + 5, y + (ROW_H - FONT_PX as i32) / 2 - 1, &t, TEXT, r.x + 2, text_w);
     }
 }
 
@@ -951,6 +1036,40 @@ mod tests {
         assert_eq!(f.choice(c), 2, "stops at the last");
         assert_eq!(f.key(Key::Escape), Event::None, "closes the list, not the form");
         assert_eq!(f.key(Key::Escape), Event::Cancel);
+    }
+
+    #[test]
+    fn the_wheel_and_the_scroll_bar_move_a_long_drop_down_without_picking() {
+        let mut f: Form<Act> = Form::new(300, 300);
+        let c = f.add(Rect::new(10, 10, 120, 24), Widget::Choice { options: rows(40), selected: 5 });
+        f.mouse_down(20, 20, false);
+        let list = f.dropdown(c);
+        assert_eq!(f.drop_start(c), 0);
+        // The wheel scrolls the window, three rows a notch, and picks nothing.
+        assert_eq!(f.wheel_at(list.x + 5, list.y + 5, -2), Event::None);
+        assert_eq!(f.drop_start(c), 6);
+        assert_eq!(f.choice(c), 5);
+        f.wheel_at(list.x + 5, list.y + 5, -100);
+        assert_eq!(f.drop_start(c), 30, "not past the end");
+        // Dragging the thumb moves the window and picks nothing either.
+        let (ty, _) = bar_thumb(list, 40, 30);
+        let x = bar_track(list).x + 2;
+        assert_eq!(f.mouse_down(x, ty + 2, false), Event::None);
+        assert!(f.drag(x, bar_track(list).y), "up to the top");
+        assert_eq!(f.drop_start(c), 0);
+        f.mouse_up(x, 0);
+        assert!(!f.drag(x, 200), "let go: the thumb no longer follows");
+        assert_eq!(f.choice(c), 5);
+        // A click on a name picks it; the arrows pick too and keep it in view.
+        assert_eq!(f.mouse_down(list.x + 5, list.y + 2 + 3 * ROW_H + 2, false), Event::Selected);
+        assert_eq!(f.choice(c), 3);
+        f.mouse_down(20, 20, false);
+        for _ in 0..20 {
+            assert_eq!(f.key(Key::Down), Event::Selected);
+        }
+        assert_eq!(f.choice(c), 23);
+        let top = f.drop_start(c);
+        assert!((top..top + DROP_ROWS).contains(&23), "the pick shows");
     }
 
     #[test]

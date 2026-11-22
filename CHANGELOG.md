@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Long drop-downs (the Palette list) have a scroll bar you can drag, and the mouse wheel scrolls the list without picking anything. A palette is applied only by a click on a name or by the arrow keys.
 - Palettes now suit every vector skin: colours are judged by how much colour they have (chroma), so the built-in Popamp Default no longer turns light cyan with dark schemes such as Dracula.
 
 ### Added
