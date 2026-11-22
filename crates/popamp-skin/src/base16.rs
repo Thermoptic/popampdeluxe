@@ -1,21 +1,26 @@
 //! Base16 colour schemes for vector skins.
 //!
-//! A scheme is sixteen colours, `base00` to `base0F`; in a dark scheme
-//! `base00` is the background and `base07` the brightest text. The forty
-//! below are the dark schemes of the Base16 collection of tinted-theming
-//! (https://github.com/tinted-theming/schemes, MIT licence), listed by
-//! their id in that collection.
+//! A scheme is sixteen colours with fixed roles, `base00` to `base0F`; the
+//! forty below are the dark schemes of the Base16 collection of
+//! tinted-theming (https://github.com/tinted-theming/schemes, MIT licence),
+//! listed by their id in that collection.
 //!
 //! A scheme recolours a skin without any change to the skin's files. Every
-//! colour in the skin's pictures and colour set is replaced: a grey by the
-//! colour of the scheme's `base00`..`base07` ramp that sits where the old
-//! colour sat between the skin's darkest and lightest, so a skin keeps its
-//! light and dark parts, only in other colours; a colour with colour in it
-//! (a gold edge, a green slider, a red one) by the accent of the scheme
-//! (`base08`..`base0F`) nearest in hue, as light or dark as the old colour
-//! was; a little colour in a grey (a blue-ish metal) takes a little of it.
-//! The skin's text, in the playlist and the library, in the title and in the
-//! clock, takes the scheme's text colour.
+//! colour written in the skin's pictures and colour set is replaced, by role:
+//!
+//! * `base00` is the background: the darkest parts of the skin, the displays
+//!   and the large surfaces, which stay in `base00` to `base03` (`base01`
+//!   panels, `base02` raised edges and the picked row, `base03` lines).
+//! * `base05` is the text: in the playlist and the library, in the title and
+//!   in the clock; `base07` stands out (the playing track, the lightest
+//!   edges). `base04` is left for small parts.
+//! * The metal is tinted 22 per cent with `base0E`.
+//! * The lines of the title bars are `base0E` and the lamps of the buttons
+//!   (EQ, PL, Shuffle, Repeat, On, Auto, the play lamp) `base0B`, each from a
+//!   dark edge through the accent to a light one, as the skin drew them.
+//! * Any other part with colour in it becomes the accent (`base08` to
+//!   `base0F`) nearest in hue.
+//! * The light buttons stay light: `base05` to `base06`.
 
 /// One Base16 scheme.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,11 +82,13 @@ pub fn find(id: &str) -> Option<&'static Scheme> {
     SCHEMES.iter().find(|s| s.id == id)
 }
 
-fn channels(c: u32) -> [f32; 3] {
+type Rgb = [f32; 3];
+
+fn channels(c: u32) -> Rgb {
     [((c >> 16) & 0xff) as f32, ((c >> 8) & 0xff) as f32, (c & 0xff) as f32]
 }
 
-fn pack(c: [f32; 3]) -> u32 {
+fn pack(c: Rgb) -> u32 {
     let b = |v: f32| v.round().clamp(0.0, 255.0) as u32;
     (b(c[0]) << 16) | (b(c[1]) << 8) | b(c[2])
 }
@@ -92,12 +99,12 @@ pub fn luma(c: u32) -> f32 {
     (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0
 }
 
-fn mix(a: [f32; 3], b: [f32; 3], t: f32) -> [f32; 3] {
+fn mix(a: Rgb, b: Rgb, t: f32) -> Rgb {
     [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
 }
 
 /// Hue (degrees), saturation and lightness (each 0 to 1).
-fn to_hsl(c: [f32; 3]) -> [f32; 3] {
+fn to_hsl(c: Rgb) -> [f32; 3] {
     let (r, g, b) = (c[0] / 255.0, c[1] / 255.0, c[2] / 255.0);
     let (mx, mn) = (r.max(g).max(b), r.min(g).min(b));
     let (l, d) = ((mx + mn) / 2.0, mx - mn);
@@ -115,7 +122,7 @@ fn to_hsl(c: [f32; 3]) -> [f32; 3] {
     [h * 60.0, s, l]
 }
 
-fn from_hsl([h, s, l]: [f32; 3]) -> [f32; 3] {
+fn from_hsl([h, s, l]: [f32; 3]) -> Rgb {
     let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
     let x = c * (1.0 - ((h / 60.0).rem_euclid(2.0) - 1.0).abs());
     let m = l - c / 2.0;
@@ -130,41 +137,39 @@ fn from_hsl([h, s, l]: [f32; 3]) -> [f32; 3] {
     [(r + m) * 255.0, (g + m) * 255.0, (b + m) * 255.0]
 }
 
-impl Scheme {
-    /// `base00` to `base07` from the darkest to the lightest. Most schemes
-    /// have them in that order, but a few put an accent in `base07`.
-    pub fn ramp(&self) -> [u32; 8] {
-        let mut ramp: [u32; 8] = std::array::from_fn(|i| self.colors[i]);
-        ramp.sort_by(|a, b| luma(*a).total_cmp(&luma(*b)));
-        ramp
-    }
+/// Hue (degrees), strength and brightness (each 0 to 1) as a painter sees
+/// colour: a pale cream has little strength, a gold edge much.
+fn to_hsv(c: Rgb) -> [f32; 3] {
+    let (mx, mn) = (c[0].max(c[1]).max(c[2]), c[0].min(c[1]).min(c[2]));
+    [to_hsl(c)[0], if mx > 0.0 { (mx - mn) / mx } else { 0.0 }, mx / 255.0]
+}
 
-    /// The colour that replaces `old`, when the skin's colours run from
-    /// `y_min` to `y_max` in [`luma`].
-    pub fn map(&self, old: u32, y_min: f32, y_max: f32) -> u32 {
-        let t = if y_max - y_min > 1e-6 { ((luma(old) - y_min) / (y_max - y_min)).clamp(0.0, 1.0) } else { 0.5 };
-        // The ramp, the skin's darkest at its start.
-        let (ramp, at) = (self.ramp(), t * 7.0);
-        let i = (at as usize).min(6);
-        let mut out = mix(channels(ramp[i]), channels(ramp[i + 1]), at - i as f32);
-        // A colour with a little colour in it takes some of the accent.
-        let [hue, sat, _] = to_hsl(channels(old));
-        let weight = ((sat - 0.08) * 3.5).clamp(0.0, 1.0);
-        if weight > 0.0 {
-            let [h, s, l] = to_hsl(channels(self.accent_near(hue)));
-            // The accent's own lightness, drawn a little toward where the skin had it.
-            let lightness = (l + (to_hsl(out)[2] - l) * 0.45).clamp(0.1, 0.9);
-            out = mix(out, from_hsl([h, s, lightness]), weight);
-        }
-        pack(out)
+/// Where each lightness of the skin lands on the neutral colours, as places
+/// from `base00` (0) to `base07` (7): the skin's large surfaces are the dark
+/// ones, and only its light buttons and edges go up to `base05`.
+const ANCHORS: [(f32, f32); 8] = [(0.0, 0.0), (0.22, 0.15), (0.4, 0.9), (0.55, 1.7), (0.68, 2.6), (0.8, 3.0), (0.9, 5.0), (1.0, 6.6)];
+
+/// How much of `base0E` the neutral colours are tinted with.
+const TINT: f32 = 0.22;
+
+fn hue_gap(a: f32, b: f32) -> f32 {
+    let d = (a - b).abs() % 360.0;
+    d.min(360.0 - d)
+}
+
+impl Scheme {
+    /// `base00` to `base07` as a ramp. `base04` is left out (it is the
+    /// colour of small status parts, and some schemes make it an accent) and
+    /// a `base07` darker than `base06` (an accent there) is not used.
+    fn ramp(&self) -> [Rgb; 8] {
+        let c: [Rgb; 8] = std::array::from_fn(|i| channels(self.colors[i]));
+        let top = if luma(self.colors[7]) < luma(self.colors[6]) { c[6] } else { c[7] };
+        [c[0], c[1], c[2], c[3], mix(c[3], c[5], 0.5), c[5], c[6], top]
     }
 
     /// The accent (`base08`..`base0F`) whose hue is nearest `hue`, in degrees.
     fn accent_near(&self, hue: f32) -> u32 {
-        let away = |c: u32| {
-            let d = (to_hsl(channels(c))[0] - hue).abs();
-            d.min(360.0 - d)
-        };
+        let away = |c: u32| hue_gap(to_hsl(channels(c))[0], hue);
         self.colors[8..].iter().copied().min_by(|a, b| away(*a).total_cmp(&away(*b))).unwrap_or(self.colors[13])
     }
 
@@ -175,13 +180,56 @@ impl Scheme {
 
     /// The colour of text that stands out, the playing track: the scheme's lightest.
     pub fn bright(&self) -> u32 {
-        self.ramp()[7]
+        pack(self.ramp()[7])
+    }
+
+    /// One accent from a dark edge (`base00`) through itself, at brightness
+    /// `reference`, to a light edge (`base07`), as the part of the skin drawn
+    /// with brightness `v` was shaded.
+    fn shaded(&self, accent: u32, v: f32, reference: f32) -> u32 {
+        let a = channels(accent);
+        let out = if v >= reference {
+            mix(a, self.ramp()[7], ((v - reference) / (1.0 - reference + 1e-6) * 0.55).min(1.0))
+        } else {
+            mix(channels(self.colors[0]), a, (v / reference).powf(0.9))
+        };
+        pack(out)
+    }
+
+    /// The colour that replaces `old`.
+    pub fn map(&self, old: u32) -> u32 {
+        let rgb = channels(old);
+        let [hue, strength, v] = to_hsv(rgb);
+        // The gold lines of a title bar and the green of a lamp have accents of their own.
+        if (25.0..=65.0).contains(&hue) && strength > 0.25 {
+            return self.shaded(self.colors[14], v, 0.83);
+        }
+        if (85.0..=155.0).contains(&hue) && strength > 0.3 {
+            return self.shaded(self.colors[11], v, 1.0);
+        }
+        // The neutral colour for this lightness.
+        let y = luma(old);
+        let ramp = self.ramp();
+        let at = ANCHORS.windows(2).find(|w| y <= w[1].0).map_or(7.0, |w| w[0].1 + (w[1].1 - w[0].1) * (y - w[0].0) / (w[1].0 - w[0].0));
+        let i = (at as usize).min(6);
+        let mut out = mix(ramp[i], ramp[i + 1], (at - i as f32).min(1.0));
+        // The metal is tinted with an accent.
+        let [h, s, _] = to_hsl(channels(self.colors[14]));
+        out = mix(out, from_hsl([h, s * 0.7, to_hsl(out)[2]]), TINT);
+        // A part with colour in it becomes the accent nearest in hue, as light or dark as it was.
+        let weight = ((strength - 0.08) * 3.5).clamp(0.0, 1.0);
+        if weight > 0.0 {
+            let [h, s, l] = to_hsl(channels(self.accent_near(hue)));
+            let lightness = (l + (to_hsl(rgb)[2] - 0.5) * 0.5).clamp(0.12, 0.88);
+            out = mix(out, from_hsl([h, s, lightness]), weight);
+        }
+        pack(out)
     }
 
     /// `svg` with every colour written in it replaced (`ink`: a sheet of
     /// letters or digits, whose light colour becomes the scheme's text
     /// colour). A colour in a `url(#id)` is an id, and is left.
-    pub fn recolour_svg(&self, svg: &str, y_min: f32, y_max: f32, ink: bool) -> String {
+    pub fn recolour_svg(&self, svg: &str, ink: bool) -> String {
         let bytes = svg.as_bytes();
         let mut out = String::with_capacity(svg.len());
         let (mut i, mut last) = (0, 0);
@@ -198,7 +246,7 @@ impl Scheme {
                         let (r, g, b) = ((value >> 8) & 0xf, (value >> 4) & 0xf, value & 0xf);
                         ((r * 17) << 16) | ((g * 17) << 8) | (b * 17)
                     };
-                    let new = if ink && luma(old) > 0.5 { self.text() } else { self.map(old, y_min, y_max) };
+                    let new = if ink && luma(old) > 0.5 { self.text() } else { self.map(old) };
                     out.push_str(&svg[last..i]);
                     out.push_str(&format!("#{new:06x}"));
                     i += 1 + digits;
@@ -216,6 +264,8 @@ impl Scheme {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const DRACULA: &str = "dracula";
 
     #[test]
     fn there_are_forty_dark_schemes_with_different_ids_and_names() {
@@ -238,53 +288,68 @@ mod tests {
     }
 
     #[test]
-    fn the_darkest_colour_becomes_the_schemes_darkest_and_the_lightest_its_lightest() {
-        let nord = find("nord").unwrap();
-        // Nord has an accent in base07; the ramp is by lightness, not by number.
-        assert_eq!(nord.ramp()[0], nord.colors[0]);
-        assert_eq!(nord.ramp()[7], nord.colors[6]);
-        assert_eq!(nord.map(0x040404, luma(0x040404), luma(0xe0e0e0)), nord.colors[0]);
-        assert_eq!(nord.map(0xe0e0e0, luma(0x040404), luma(0xe0e0e0)), nord.colors[6]);
-        // A colour half way lands between base03 and base04.
-        let mid = nord.map(0x7f7f7f, 0.0, 1.0);
-        assert!(luma(mid) > luma(nord.colors[2]) && luma(mid) < luma(nord.colors[6]));
+    fn black_is_the_background_and_the_big_dark_surfaces_stay_dark() {
+        for s in &SCHEMES {
+            assert!((luma(s.map(0x000000)) - luma(s.colors[0])).abs() < 0.06, "{}: black is the background", s.name);
+            // The metal of the skin (a mid grey) is darker than base04: the window is not light.
+            let metal = s.map(0x6e6e6e);
+            assert!(luma(metal) < luma(s.colors[4]).max(luma(s.colors[3]) + 0.05), "{}: {metal:06x}", s.name);
+        }
+        let dracula = find(DRACULA).unwrap();
+        assert!(luma(dracula.map(0x6e6e6e)) < 0.35, "a mid grey is dark in Dracula, not light blue");
     }
 
     #[test]
-    fn what_has_no_colour_takes_none_of_the_accent_and_what_has_some_takes_a_little() {
-        let nord = find("nord").unwrap();
-        let grey = nord.map(0x808080, 0.0, 1.0);
-        let ramp = nord.ramp();
-        let at = luma(0x808080) * 7.0;
-        let ramp_only = pack(mix(channels(ramp[at as usize]), channels(ramp[at as usize + 1]), at.fract()));
-        assert_eq!(grey, ramp_only, "a grey is the ramp alone");
-        assert_ne!(nord.map(0x8080d0, 0.0, 1.0), ramp_only, "a bluish colour takes some accent");
+    fn the_light_buttons_stay_light_and_neutral() {
+        let s = find(DRACULA).unwrap();
+        let cream = s.map(0xfaefe3);
+        assert!(luma(cream) > 0.7, "{cream:06x}");
+        let [_, strength, _] = to_hsv(channels(cream));
+        assert!(strength < 0.25, "a cream is not made into an accent: {cream:06x}");
     }
 
     #[test]
-    fn a_colour_with_much_colour_in_it_becomes_the_accent_nearest_in_hue() {
+    fn the_lines_of_the_title_bar_are_base0e_and_the_lamps_base0b() {
+        let s = find(DRACULA).unwrap();
+        // The skin's gold, at the brightness it has in the middle of a line, and its bright green.
+        let near = |a: u32, b: u32| channels(a).iter().zip(channels(b)).all(|(x, y)| (x - y).abs() <= 3.0);
+        assert!(near(s.map(0xd3b069), s.colors[14]), "gold lines are base0e: {:06x}", s.map(0xd3b069));
+        assert_eq!(s.map(0x00ff00), s.colors[11], "a lit lamp is base0b");
+        // From a dark edge to a light one.
+        assert!(luma(s.map(0x2b2415)) < luma(s.map(0xd3b069)) && luma(s.map(0xd3b069)) < luma(s.map(0xffffac)));
+        assert!(luma(s.map(0x162b14)) < luma(s.map(0x008600)), "an unlit lamp is darker than a lit one");
+    }
+
+    #[test]
+    fn a_part_with_other_colour_goes_to_the_accent_nearest_in_hue() {
         let s = find("gruvbox-dark-hard").unwrap();
-        // Pure red, green and yellow go to the scheme's red, green and yellow, not to one accent.
-        let (red, green, yellow) = (s.map(0xff0000, 0.0, 1.0), s.map(0x00ff00, 0.0, 1.0), s.map(0xffff00, 0.0, 1.0));
-        assert_ne!(red, green);
-        assert_ne!(green, yellow);
         let hue = |c: u32| to_hsl(channels(c))[0];
-        let near = |a: f32, b: f32| (a - b).abs().min(360.0 - (a - b).abs());
-        assert!(near(hue(red), hue(s.colors[8])) < 20.0, "red is near base08 (fb4934)");
-        assert!((60.0..180.0).contains(&hue(green)), "green stays a green");
-        assert!(near(hue(yellow), hue(s.colors[10])) < 25.0, "yellow is near base0A (fabd2f)");
+        let red = s.map(0xff0000);
+        let blue = s.map(0x0000ff);
+        assert!(hue_gap(hue(red), hue(s.colors[8])) < 20.0, "red is near base08: {red:06x}");
+        assert!(hue_gap(hue(blue), hue(s.colors[13])) < 40.0, "blue is near base0d: {blue:06x}");
+        assert_ne!(red, blue);
+    }
+
+    #[test]
+    fn text_is_base05_and_what_stands_out_the_lightest() {
+        let s = find(DRACULA).unwrap();
+        assert_eq!((s.text(), s.bright()), (0xf8f8f2, 0xffffff));
+        // Nord has an accent in base07: the lightest used is base06.
+        let nord = find("nord").unwrap();
+        assert_eq!(nord.bright(), nord.colors[6]);
     }
 
     #[test]
     fn colours_in_a_picture_are_replaced_but_ids_are_not() {
         let nord = find("nord").unwrap();
         let svg = r##"<svg><rect fill="#000000" style="stroke:#ffffff"/><use href="url(#abc123)"/><stop stop-color='#fff'/></svg>"##;
-        let out = nord.recolour_svg(svg, 0.0, 1.0, false);
-        assert!(out.contains("fill=\"#2e3440\""), "{out}");
+        let out = nord.recolour_svg(svg, false);
+        assert!(out.contains(&format!("fill=\"#{:06x}\"", nord.map(0))), "{out}");
         assert!(out.contains("url(#abc123)"), "an id that looks like a colour stays");
         assert!(!out.contains("#ffffff") && !out.contains("'#fff'"), "{out}");
-        // A sheet of letters: the light colour is the scheme's text colour, the dark one is the ramp's.
-        let letters = nord.recolour_svg(r##"<path fill="#ffffff"/><path fill="#000000"/>"##, 0.0, 1.0, true);
-        assert!(letters.contains(&format!("#{:06x}", nord.text())) && letters.contains("#2e3440"), "{letters}");
+        // A sheet of letters: the light colour is the scheme's text colour.
+        let letters = nord.recolour_svg(r##"<path fill="#ffffff"/><path fill="#000000"/>"##, true);
+        assert!(letters.contains(&format!("#{:06x}", nord.text())) && letters.contains(&format!("#{:06x}", nord.map(0))), "{letters}");
     }
 }

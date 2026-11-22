@@ -13,13 +13,14 @@ All notable changes to this project are documented here. The format follows
   Tokyo Night and more, from tinted-theming/schemes). Pick one with the mouse, or open the list and
   walk through it with the arrow keys (the wheel works too): each is on in the player at once.
   It recolours any vector skin (`.psz` and the built-in one) without any change to the skin's
-  files, and all of it: every colour written in the skin's pictures, so the sliders, the volume
-  and balance bars, the equalizer's sliders and buttons and the edges change too, not only the
-  colour set. A grey becomes the scheme's colour at the same lightness; a coloured part (a gold
-  edge, a green or red slider) becomes the scheme's accent nearest in hue, as light or dark as it
-  was; a little colour in a grey takes a little accent. The text is one colour, the scheme's text
-  colour (base05): in the playlist and the Media Library, in the scrolling title and the clock of
-  the main window; the playing track in the lists is the scheme's lightest. *Original* gives the
+  files, and all of it: every colour written in the skin's pictures, by the roles Base16 gives
+  its sixteen colours. `base00` is the background: the skin's large surfaces and displays stay in
+  `base00` to `base03`, so a window is dark, not light. `base05` is the text everywhere (the
+  playlist, the Media Library, the scrolling title, the clock) and `base07` what stands out. The
+  metal is tinted with `base0E`; the lines along the title bars are `base0E` and the lamps of the
+  toggle buttons (EQ, PL, Shuffle, Repeat, On, Auto) `base0B`, each shaded from a dark edge to a
+  light one as the skin drew it. Other coloured parts, such as sliders, become the accent
+  (`base08`..`base0F`) nearest in hue; the light buttons stay light. *Original* gives the
   skin's own colours back. A classic `.wsz` skin keeps its colours. Kept in `popamp.ini`
   (`skin_palette`). A drop-down with many options shows ten at a time.
 - **Pause and resume across a restart.** Popamp starts as it was closed: the playlist and the

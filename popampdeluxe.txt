@@ -39,20 +39,24 @@
      * Pick "Original" to go back to the skin's own colours.
 
   The skin files are not changed. Popamp recolours every colour of the skin
-  with the palette's:
+  by the roles a Base16 palette gives its sixteen colours:
 
-     * Greys: the dark parts of the skin get the palette's dark colours,
-       the light parts its light ones.
-     * Coloured parts, such as the sliders of the main window and the
-       equalizer, the volume and balance bars and the gold edges: each
-       becomes the palette's accent nearest in colour (red, orange, yellow,
-       green, cyan, blue, purple, brown), as light or dark as it was.
-     * A little colour in a grey, such as bluish metal, takes a little of
-       the palette's accent.
-     * Text: all of it is one colour, the palette's text colour. The
-       playlist and the Media Library, the scrolling title and the clock in
-       the main window are the same. The track playing in a list is the
-       palette's lightest colour.
+     base00        the background: the large surfaces and the displays of the
+                   skin, so a window is dark
+     base01-03     panels, raised edges and the picked row, lines
+     base05        all text: the playlist and the Media Library, the
+                   scrolling title and the clock in the main window
+     base07        what stands out: the track playing in a list, the lightest
+                   edges (base04 is kept for small parts)
+     base0E        the lines along the title bars, and a light tint (22 per
+                   cent) over the metal
+     base0B        the lamps of the toggle buttons (EQ, PL, Shuffle, Repeat,
+                   On, Auto): dark when off, base0B when on
+     base08-0F     other coloured parts, such as sliders: the accent nearest
+                   in colour (red, orange, yellow, green, cyan, blue, purple)
+
+  Lines and lamps are shaded from a dark edge, through the colour, to a
+  light edge, as the skin drew them. The light buttons stay light.
 
   It works with vector skins (.psz and the built-in skin). A classic .wsz
   skin is pictures and keeps its colours. The choice is kept in popamp.ini

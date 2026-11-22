@@ -507,12 +507,12 @@ impl Builder<'_> {
             }
         }
         // With a scheme all the skin's text is one colour: the lists, the title and the clock.
-        if let Some((scheme, lo, hi)) = self.palette.scheme() {
+        if let Some(scheme) = self.palette.scheme() {
             self.skin.pl.normal = scheme.text();
             self.skin.pl.current = scheme.bright();
             if file.playlist.is_none() {
-                self.skin.pl.normal_bg = scheme.map(self.skin.pl.normal_bg, lo, hi);
-                self.skin.pl.selected_bg = scheme.map(self.skin.pl.selected_bg, lo, hi);
+                self.skin.pl.normal_bg = scheme.map(self.skin.pl.normal_bg);
+                self.skin.pl.selected_bg = scheme.map(self.skin.pl.selected_bg);
             }
             for style in [&mut self.skin.text, &mut self.skin.clock].into_iter().flatten() {
                 style.color = scheme.text();
@@ -747,9 +747,9 @@ impl Builder<'_> {
             None => {
                 let data = self.files.get(file).ok_or_else(|| format!("no file `{file}` in the skin"))?;
                 // With a scheme every colour written in the picture is recoloured, not only those the set names.
-                let recoloured = self.palette.scheme().and_then(|(scheme, lo, hi)| {
+                let recoloured = self.palette.scheme().and_then(|scheme| {
                     let text = std::str::from_utf8(data).ok()?;
-                    Some(scheme.recolour_svg(text, lo, hi, self.ink).into_bytes())
+                    Some(scheme.recolour_svg(text, self.ink).into_bytes())
                 });
                 let id = self.skin.svgs.add(recoloured.as_deref().unwrap_or(data), self.css.as_deref()).map_err(|e| format!("{file}: {e}"))?;
                 self.svg_ids.insert(file.to_string(), id);
