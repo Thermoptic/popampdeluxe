@@ -217,7 +217,9 @@ impl Scheme {
         let [h, s, _] = to_hsl(channels(self.colors[14]));
         out = mix(out, from_hsl([h, s * 0.7, to_hsl(out)[2]]), TINT);
         // A part with colour in it becomes the accent nearest in hue, as light or dark as it was.
-        let weight = ((strength - 0.08) * 3.5).clamp(0.0, 1.0);
+        // How much colour it has is its chroma, so a dark navy is not taken for a colour.
+        let chroma = (rgb[0].max(rgb[1]).max(rgb[2]) - rgb[0].min(rgb[1]).min(rgb[2])) / 255.0;
+        let weight = ((chroma - 0.06) * 4.0).clamp(0.0, 1.0);
         if weight > 0.0 {
             let [h, s, l] = to_hsl(channels(self.accent_near(hue)));
             let lightness = (l + (to_hsl(rgb)[2] - 0.5) * 0.5).clamp(0.12, 0.88);

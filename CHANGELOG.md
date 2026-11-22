@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Palettes now suit every vector skin: colours are judged by how much colour they have (chroma), so the built-in Popamp Default no longer turns light cyan with dark schemes such as Dracula.
+
 ### Added
 
 - **Palettes in the Skin Browser:** a drop-down *Palette* with *Original* at the top and forty dark
