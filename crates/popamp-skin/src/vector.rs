@@ -576,7 +576,27 @@ impl Builder<'_> {
         if def.key == WindowKey::Library {
             // Every skin's library can shade, as the playlist's does: a
             // double click on its title bar, where the skin left that open.
-            def.shade.get_or_insert_with(crate::classic::library_shade);
+            if def.shade.is_none() {
+                let mut shade = crate::classic::library_shade();
+                // The skin's title picture (centred in the top 20 rows of the open
+                // window) is in the strip too, cut to its 14 rows.
+                let title = def.normal.elements.iter().find(|e| {
+                    matches!(e.kind, Kind::Image { fill: Fill::Once, .. })
+                        && matches!((e.at.left, e.at.right, e.at.top, e.at.bottom), (Pos::Center(_), Pos::Center(_), Pos::Start(0), Pos::Start(20)))
+                });
+                if let Some(title) = title {
+                    let mut title = title.clone();
+                    title.at.bottom = Pos::Start(14);
+                    if let Kind::Image { look, .. } = &mut title.kind {
+                        for p in [&mut look.normal, &mut look.pressed, &mut look.on, &mut look.on_pressed, &mut look.inactive].into_iter().flatten() {
+                            p.src.h = p.src.h.min(14);
+                        }
+                    }
+                    let at = shade.elements.iter().position(|e| matches!(e.kind, Kind::Drag { .. })).unwrap_or(shade.elements.len());
+                    shade.elements.insert(at, title);
+                }
+                def.shade = Some(shade);
+            }
             for e in &mut def.normal.elements {
                 if let Kind::Drag { double } = &mut e.kind {
                     double.get_or_insert(Command::ToggleLibraryShade);
