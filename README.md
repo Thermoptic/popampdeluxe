@@ -9,7 +9,7 @@ download: [popampdeluxe.txt](popampdeluxe.txt).*
   Pick one, or walk through the list with the arrow keys, and every vector skin is recoloured
   in the player at once: dark base00 surfaces, base0E title-bar lines, base0B lamps, base05 text.
 
-<p align="center"><img src="assets/screenshots/palette.webp" alt="The player, equalizer and playlist in a Base16 palette"></p>
+<p align="center"><img src="assets/screenshots/palette.gif" alt="The player, equalizer and playlist in a Base16 palette"></p>
 
 - **Hotkeys** (Preferences > Hotkeys). Every keyboard shortcut is listed and can
   be changed, added to, cleared or reset. Kept in `popamp.ini`.
