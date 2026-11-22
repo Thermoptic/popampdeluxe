@@ -342,6 +342,71 @@ impl LibraryPane {
         p
     }
 
+    /// What the window is like, to come back to it (see `FolderTree::state`
+    /// for the folder tree): the library's view, the artist, album and
+    /// search, the order and where the lists are scrolled.
+    pub fn state(&self) -> Vec<(&'static str, String)> {
+        let mut v = self.tree.state();
+        let view = match &self.view {
+            View::Recent => "recent".to_string(),
+            View::Folder(f) => format!("folder:{f}"),
+            View::All | View::Space => "all".to_string(),
+        };
+        let sort = match self.sort.0 {
+            Sort::Artist => "artist",
+            Sort::Title => "title",
+            Sort::Album => "album",
+            Sort::Length => "length",
+            Sort::Year => "year",
+            Sort::Genre => "genre",
+            Sort::Added => "added",
+        };
+        v.extend([
+            ("ml_view", view),
+            ("ml_artist", self.artist.clone().unwrap_or_default()),
+            ("ml_album", self.album.clone().unwrap_or_default()),
+            ("ml_query", self.query.clone()),
+            ("ml_sort", format!("{sort}:{}", if self.sort.1 { "reverse" } else { "forward" })),
+            ("ml_scroll", self.scroll.map(|n| n.to_string()).join(",")),
+        ]);
+        v
+    }
+
+    /// Goes back to what `state` wrote, as far as it is still there.
+    pub fn restore(&mut self, get: &dyn Fn(&str) -> Option<String>) {
+        self.tree.restore(get);
+        if let Some(v) = get("ml_view") {
+            self.view = match v.as_str() {
+                "recent" => View::Recent,
+                f if f.starts_with("folder:") => View::Folder(f["folder:".len()..].to_string()),
+                _ => View::All,
+            };
+        }
+        self.artist = get("ml_artist").filter(|a| !a.is_empty());
+        self.album = get("ml_album").filter(|a| !a.is_empty());
+        self.query = get("ml_query").unwrap_or_default();
+        if let Some((name, order)) = get("ml_sort").as_deref().and_then(|s| s.split_once(':')).map(|(a, b)| (a.to_string(), b.to_string())) {
+            let by = match name.as_str() {
+                "title" => Sort::Title,
+                "album" => Sort::Album,
+                "length" => Sort::Length,
+                "year" => Sort::Year,
+                "genre" => Sort::Genre,
+                "added" => Sort::Added,
+                _ => Sort::Artist,
+            };
+            self.sort = (by, order == "reverse");
+        }
+        // The lists are made from what was restored; a view, artist or album that is
+        // gone is dropped by `refresh`.
+        self.refresh();
+        if let Some(s) = get("ml_scroll") {
+            for (slot, n) in self.scroll.iter_mut().zip(s.split(',')) {
+                *slot = n.parse().unwrap_or(0);
+            }
+        }
+    }
+
     fn views(&self) -> Vec<View> {
         let folders = self.lib.folders.iter().map(|f| View::Folder(f.clone()));
         [View::All, View::Recent].into_iter().chain((!self.lib.folders.is_empty()).then_some(View::Space)).chain(folders).collect()
@@ -1412,6 +1477,28 @@ mod tests {
         assert_eq!(titles(&p), ["Four", "One", "Three", "Two"]);
         p.press(AT, title_x + 3, t.header.y + 2, false, false, false);
         assert_eq!(titles(&p), ["Two", "Three", "One", "Four"]);
+    }
+
+    #[test]
+    fn the_library_comes_back_as_it_was_left() {
+        let mut p = pane();
+        p.view = View::Folder("/more".into());
+        p.query = "gam".into();
+        p.sort = (Sort::Title, true);
+        p.refresh();
+        p.scroll = [0, 0, 0, 7];
+        let saved = p.state();
+        let get = |k: &str| saved.iter().find(|s| s.0 == k).map(|s| s.1.clone());
+        let mut back = pane();
+        back.restore(&get);
+        assert_eq!((back.view.clone(), back.query.as_str(), back.sort), (View::Folder("/more".into()), "gam", (Sort::Title, true)));
+        assert_eq!(titles(&back), titles(&p));
+        assert_eq!(back.scroll[3], 7);
+        // A view of a folder that is gone is dropped.
+        let mut gone = pane();
+        gone.lib.folders = vec!["/music".into()];
+        gone.restore(&get);
+        assert_eq!(gone.view, View::All);
     }
 
     #[test]

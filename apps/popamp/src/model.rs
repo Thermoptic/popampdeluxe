@@ -109,6 +109,9 @@ pub struct Model {
     pub config: Config,
     /// The keys of the keyboard shortcuts.
     pub keymap: crate::keymap::Keymap,
+    /// Where the track that was playing at the last close stopped: its place in
+    /// the playlist and how far in (ms). Play starts there, once.
+    pub resume: Option<(usize, u64)>,
     pub playlist: Playlist,
     pub engine: Engine,
     pub format: Arc<Format>,
@@ -270,10 +273,13 @@ impl Model {
         library.tree_mode = config.settings.ml_foldertree;
         library.tree.hide_ext = config.settings.ml_hide_ext;
         library.tree.set_bookmarks(bookmarks.iter().map(|b| (b.location.clone(), bookmark_label(b))).collect());
+        // The window as it was left: the folder, the place in it, the order.
+        library.restore(&|key| config.state(key).map(String::from));
         let skin = Skin::builtin_vector(Some(&config.settings.skin_colors));
         let keymap = crate::keymap::Keymap::load(|id| config.hotkey(id));
         let mut m = Model {
             keymap,
+            resume: None,
             library,
             paths,
             config,
@@ -525,6 +531,16 @@ impl Model {
             if pos < self.playlist.len() {
                 self.playlist.set_current(Some(pos));
                 self.playlist.cursor = pos;
+                // The track that was playing: stopped, but Play goes on from where it was.
+                let (loc, ms) = (self.settings().resume_loc.clone(), u64::from(self.settings().resume_ms));
+                // The same place in the playlist and the same file (a path may be written another way).
+                let same = |a: &str, b: &str| {
+                    let name = |p: &str| p.rsplit(['/', '\\']).next().unwrap_or_default().to_lowercase();
+                    !a.is_empty() && name(a) == name(b)
+                };
+                if ms >= 2000 && self.playlist.entry(pos).is_some_and(|e| same(&e.location, &loc)) {
+                    self.resume = Some((pos, ms));
+                }
             }
             self.pl_dirty += 1;
         }
@@ -568,6 +584,20 @@ impl Model {
     pub fn save_session(&mut self) {
         self.sync_tree();
         self.settings_mut().plpos = self.playlist.current().unwrap_or(0) as i32;
+        // The track playing or paused now, and how far: the next start goes on from it.
+        if self.state() != PlayState::Stopped {
+            let at = self.playlist.current().and_then(|i| self.playlist.entry(i)).map(|e| e.location.clone());
+            let ms = self.engine.position_ms().min(u64::from(u32::MAX)) as u32;
+            self.settings_mut().resume_loc = at.unwrap_or_default();
+            self.settings_mut().resume_ms = ms;
+        } else if self.resume.is_none() {
+            self.settings_mut().resume_loc = String::new();
+            self.settings_mut().resume_ms = 0;
+        }
+        // And what the Media Library is like.
+        for (key, value) in self.library.state() {
+            self.config.set_state(key, &value);
+        }
         if let Err(e) = self.save_playlist_file(&self.paths.playlist_file()) {
             log::warn!("cannot save playlist: {e}");
         }
@@ -579,6 +609,12 @@ impl Model {
     // --- playback -----------------------------------------------------------
 
     pub fn play_index(&mut self, idx: usize) {
+        self.resume = None;
+        self.open_index(idx, 0);
+    }
+
+    /// Starts track `idx` `start_ms` into it.
+    fn open_index(&mut self, idx: usize, start_ms: u64) {
         let Some(e) = self.playlist.entry(idx) else { return };
         let (id, loc) = (e.id, e.location.clone());
         self.playlist.set_current(Some(idx));
@@ -588,7 +624,7 @@ impl Model {
         if self.sources.of_now(&loc).slow() {
             self.flash("CONNECTING…");
         }
-        self.engine.send(EngineCmd::Open { id, location: loc, start_ms: 0 });
+        self.engine.send(EngineCmd::Open { id, location: loc, start_ms });
         self.pl_dirty += 1;
     }
 
@@ -613,7 +649,14 @@ impl Model {
             _ => {
                 let idx = self.playlist.current().or(if self.playlist.is_empty() { None } else { Some(0) });
                 match idx {
-                    Some(i) => self.play_index(i),
+                    Some(i) => {
+                        // The first Play after a start goes on where the last close left the track.
+                        let start = match self.resume.take() {
+                            Some((j, ms)) if j == i => ms,
+                            _ => 0,
+                        };
+                        self.open_index(i, start);
+                    }
                     None => self.request_dialog(DialogKind::OpenFiles { play: true }),
                 }
             }
@@ -2378,6 +2421,43 @@ mod tests {
         assert_eq!(m.library.tree.jump_rows().len(), 1, "the bookmark is in the Bookmarks folder at once");
         m.remove_bookmark(0);
         assert!(m.library.tree.jump_rows().is_empty());
+    }
+
+    #[test]
+    fn the_player_comes_back_as_it_was_closed_stopped_but_ready_to_go_on() {
+        use popamp_audio::{PlayState, StreamInfo};
+        let dir = std::env::temp_dir().join(format!("popamp-resume-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let open = || Model::headless(Paths::resolve(Some(dir.clone())), Config::load(dir.join("popamp.ini")));
+        let mut m = open();
+        m.add_now(vec!["/music/1.mp3".into(), "/music/2.mp3".into(), "/music/3.mp3".into()], AddMode::Append);
+        m.playlist.set_current(Some(1));
+        let info = StreamInfo { sample_rate: 44_100, channels: 2, length_ms: Some(200_000), bitrate_kbps: Some(128), codec: "mp3".into(), seekable: true };
+        m.engine.simulate(PlayState::Playing, 83_000, &info);
+        m.save_session();
+        drop(m);
+        // Opened again: the playlist and the track are back, nothing plays, and Play goes on from 83 s.
+        let mut m = open();
+        m.load_session();
+        assert_eq!(m.playlist.len(), 3);
+        assert_eq!(m.playlist.current(), Some(1));
+        assert_eq!(m.state(), PlayState::Stopped, "no sound at the start");
+        assert_eq!(m.resume, Some((1, 83_000)));
+        m.play();
+        assert_eq!(m.resume, None, "used once");
+        // Closed again without playing: still the same.
+        let mut m = open();
+        m.load_session();
+        m.save_session();
+        drop(m);
+        let mut m = open();
+        m.load_session();
+        assert_eq!(m.resume, Some((1, 83_000)), "kept while nothing played");
+        // Another track played: the old place is forgotten.
+        m.play_index(2);
+        assert_eq!(m.resume, None);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

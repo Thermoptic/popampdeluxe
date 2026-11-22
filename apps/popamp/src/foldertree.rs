@@ -236,6 +236,64 @@ impl FolderTree {
         self.dir.as_deref().and_then(Path::to_str).is_some_and(is_bookmarks)
     }
 
+    /// What the window is like, to come back to it: the folder picked, the
+    /// folder inside it on screen, the order, where the lists are scrolled
+    /// and the rows picked.
+    pub fn state(&self) -> Vec<(&'static str, String)> {
+        let dir = self.dir.as_ref().map(|d| d.to_string_lossy().into_owned()).unwrap_or_default();
+        let sort = match self.sort {
+            None => String::new(),
+            Some((by, reverse)) => format!("{}:{}", if by == SortBy::Date { "date" } else { "name" }, if reverse { "reverse" } else { "forward" }),
+        };
+        let picked: Vec<&str> = self.entries.iter().zip(&self.selected).filter(|(_, &on)| on).map(|(e, _)| e.path.as_str()).take(50).collect();
+        vec![
+            ("ft_root", self.folder().unwrap_or_default().to_string()),
+            ("ft_dir", dir),
+            ("ft_sort", sort),
+            ("ft_scroll", format!("{},{}", self.scroll[0], self.scroll[1])),
+            ("ft_picked", picked.join("|")),
+            ("ft_cursor", self.cursor.to_string()),
+        ]
+    }
+
+    /// Goes back to what `state` wrote, as far as it is still there.
+    pub fn restore(&mut self, get: &dyn Fn(&str) -> Option<String>) {
+        if let Some(s) = get("ft_sort") {
+            self.sort = match s.split_once(':') {
+                Some(("name", o)) => Some((SortBy::Name, o == "reverse")),
+                Some(("date", o)) => Some((SortBy::Date, o == "reverse")),
+                _ => None,
+            };
+        }
+        let root = get("ft_root").filter(|r| !r.is_empty());
+        let found = root.as_ref().and_then(|r| self.items.iter().position(|i| matches!(i, Item::Folder { path, .. } if path == r)));
+        if let Some(i) = found {
+            self.pick_root(i);
+            let inside = get("ft_dir").filter(|d| !d.is_empty()).filter(|d| {
+                let root = root.as_deref().unwrap_or_default();
+                is_bookmarks(root) && d == root || !is_bookmarks(root) && Path::new(d).starts_with(root) && Path::new(d).is_dir()
+            });
+            if let Some(dir) = inside {
+                self.dir = Some(PathBuf::from(dir));
+                self.reload();
+            }
+        } else {
+            self.reload();
+        }
+        let picked = get("ft_picked").unwrap_or_default();
+        for want in picked.split('|').filter(|p| !p.is_empty()) {
+            if let Some(n) = self.entries.iter().position(|e| e.path == want && !e.up) {
+                self.selected[n] = true;
+            }
+        }
+        let last = self.entries.len().saturating_sub(1);
+        let cursor = get("ft_cursor").and_then(|c| c.parse::<usize>().ok()).unwrap_or(0).min(last);
+        (self.cursor, self.anchor) = (cursor, cursor);
+        if let Some((a, b)) = get("ft_scroll").and_then(|s| s.split_once(',').map(|(a, b)| (a.to_string(), b.to_string()))) {
+            self.scroll = [a.parse().unwrap_or(0), b.parse().unwrap_or(0)];
+        }
+    }
+
     /// Whether any folder is added.
     pub fn has_folders(&self) -> bool {
         self.items.iter().any(Item::is_folder)
@@ -1104,6 +1162,42 @@ mod tests {
         t.set_bookmarks(vec![("/music/b.mp3".into(), "Beta".into())]);
         assert_eq!(names(&t), ["Beta"]);
         assert_eq!(t.lines(), ["folder|0|Bookmarks|popamp:bookmarks"], "kept like a folder in the ini file");
+    }
+
+    #[test]
+    fn the_folder_tree_comes_back_as_it_was_left() {
+        let (root, mut t) = music("state");
+        t.hide_ext = true;
+        // Into Albums, ordered by date with the oldest first, a row picked, scrolled a little.
+        let albums = root.join("Albums").to_string_lossy().into_owned();
+        t.enter(&albums);
+        t.sort_by(SortBy::Date);
+        t.sort_by(SortBy::Date);
+        t.select_only(2);
+        t.scroll = [1, 3];
+        let saved: Vec<(&str, String)> = t.state();
+        let get = |k: &str| saved.iter().find(|s| s.0 == k).map(|s| s.1.clone());
+        // A new window with the same folders, as after a restart.
+        let mut back = FolderTree::from_lines(&t.lines());
+        back.hide_ext = true;
+        assert_ne!(back.current(), t.current(), "it starts in the folder picked, not where it was left");
+        back.restore(&get);
+        assert_eq!(back.current(), t.current(), "in the folder it was left in");
+        assert_eq!(back.sort, t.sort, "ordered as it was");
+        assert_eq!(back.entries.iter().map(|e| e.path.clone()).collect::<Vec<_>>(), t.entries.iter().map(|e| e.path.clone()).collect::<Vec<_>>());
+        assert_eq!(back.picked(), t.picked(), "the same row picked");
+        assert_eq!(back.scroll, [1, 3]);
+        // A folder that is gone is not gone into.
+        let mut gone = saved.clone();
+        for s in &mut gone {
+            if s.0 == "ft_dir" {
+                s.1 = root.join("nowhere").to_string_lossy().into_owned();
+            }
+        }
+        let mut again = FolderTree::from_lines(&t.lines());
+        again.restore(&|k: &str| gone.iter().find(|s| s.0 == k).map(|s| s.1.clone()));
+        assert_eq!(again.current(), Some(root.as_path()), "back in the folder picked");
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

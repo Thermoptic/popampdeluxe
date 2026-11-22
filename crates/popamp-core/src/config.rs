@@ -203,6 +203,10 @@ settings! {
     pladv: bool = true,
     /// Playlist index to resume at.
     plpos: i32 = 0,
+    /// The track that was playing or paused when the player was closed, and
+    /// how far into it (in ms): Play starts there again, the first time.
+    resume_loc: String = String::new(),
+    resume_ms: u32 = 0,
     shuffle_morph_rate: i32 = 50,
     /// The output device, by the name the sound system gives it.
     output_device: String = "default".to_string(),
@@ -614,6 +618,21 @@ impl Config {
     /// The shortcut is as it came again: the ini file says nothing of it.
     pub fn clear_hotkey(&mut self, id: &str) {
         self.ini.remove("Hotkeys", id);
+    }
+
+    /// A thing the player remembers to come back to (`[State]`): where the
+    /// Media Library was, and the like.
+    pub fn state(&self, key: &str) -> Option<&str> {
+        self.ini.get("State", key)
+    }
+
+    /// Remembers `value` under `key`; an empty value forgets the key.
+    pub fn set_state(&mut self, key: &str, value: &str) {
+        if value.is_empty() {
+            self.ini.remove("State", key);
+        } else {
+            self.ini.set("State", key, value);
+        }
     }
 
     /// The folder tree of the Media Library as lines (`[FolderTree]`, keys

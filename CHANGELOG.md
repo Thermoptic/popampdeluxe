@@ -8,6 +8,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Pause and resume across a restart.** Popamp starts as it was closed: the playlist and the
+  track that was current are back, but nothing plays. If a track was playing or paused when
+  you closed it, the first Play goes on from where it was (not if another track is played
+  first). The Media Library is as it was left too: the folder you were in (and the folder inside
+  it), the order (Title or Date modified, up or down), the rows picked and how far the lists
+  were scrolled; for the other kind of library, the view, artist, album, search and order.
+  Kept in `popamp.ini` (`resume_loc`, `resume_ms` and a `[State]` section).
 - **Bookmarks folder in the Media Library's folder tree.** In the Folder and Group Editor,
   the box *Show Bookmarks folder* puts a folder called Bookmarks in the left list, among the
   groups and folders, to move, put in a group or take out like the others; unticking it hides

@@ -21,6 +21,27 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-22   PAUSE AND RESUME ACROSS A RESTART
+  ..........................................................................
+
+  Popamp now starts as you left it, like a pause button for the whole
+  player.
+
+     * The playlist is back, with the same track current. Nothing plays at
+       the start: it is stopped, with no sound.
+     * If a track was playing or paused when you closed Popamp, the first
+       time you press Play it goes on from where it was. If you play another
+       track first, the old place is forgotten.
+     * The Media Library is as you left it. The Foldertree comes back to the
+       folder you were in (a folder inside the one picked too), ordered as
+       you had it (Title or Date modified, up or down), with the same rows
+       picked and the lists scrolled the same. The id3 library comes back
+       to the same view, artist, album, search and order.
+
+  If a folder is gone, the library goes to the folder it can find. All this
+  is kept in popamp.ini, which is written when you close Popamp.
+
+
   2026-11-22   BOOKMARKS FOLDER IN THE MEDIA LIBRARY
   ..........................................................................
 
