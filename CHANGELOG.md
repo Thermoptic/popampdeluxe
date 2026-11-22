@@ -10,6 +10,8 @@ All notable changes to this project are documented here. The format follows
 
 - The Folder and Group Editor has "Show History folder" beside "Show Bookmarks folder": a History folder in the Media Library's left list that shows the tracks played lately, newest first.
 
+- The Folder and Group Editor is titled "Folders & Groups", has an Apply button (the edits go to the library, the editor stays open), and its Name and Path fields and check boxes are laid out with even margins.
+
 ### Fixed
 
 - The equalizer's windowshade strip in the default skin has a surface behind its volume and balance sliders (the slots of Popamp Classified) with light handles, in place of the title text they used to sit on.

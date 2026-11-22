@@ -166,7 +166,7 @@ impl Panel {
             Panel::Skins(_) => "Skin browser",
             Panel::History(_) => "History",
             Panel::Scan(_) => "ReplayGain scan",
-            Panel::Folders(_) => "Folders and groups",
+            Panel::Folders(_) => "Folders & Groups",
         }
     }
 

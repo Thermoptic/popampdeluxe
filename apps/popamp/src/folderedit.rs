@@ -150,20 +150,21 @@ impl FolderEditor {
             form.add(side(n as i32), Widget::Button { label: label.into(), action: act, default: false });
         }
         let y = 10 + list_h + 12;
-        form.add(Rect::new(10, y, 60, 24), Widget::Label { text: "Name:".into(), dim: false });
-        let name = form.add(Rect::new(74, y, WIDTH - 84, 24), Widget::Input { text: String::new(), cursor: 0 });
-        form.add(Rect::new(10, y + 30, 60, 24), Widget::Label { text: "Path:".into(), dim: false });
-        let path = form.add(Rect::new(74, y + 30, WIDTH - 84, 24), Widget::Input { text: String::new(), cursor: 0 });
-        let by = y + 66;
+        form.add(Rect::new(14, y, 60, 24), Widget::Label { text: "Name:".into(), dim: false });
+        let name = form.add(Rect::new(80, y, WIDTH - 90, 24), Widget::Input { text: String::new(), cursor: 0 });
+        form.add(Rect::new(14, y + 32, 60, 24), Widget::Label { text: "Path:".into(), dim: false });
+        let path = form.add(Rect::new(80, y + 32, WIDTH - 90, 24), Widget::Input { text: String::new(), cursor: 0 });
+        let by = y + 70;
         let shown = model.library.tree.items.iter().any(Item::is_bookmarks);
         let bookmarks = form.add(
-            Rect::new(10, by, 230, 24),
+            Rect::new(12, by, 130, 24),
             Widget::Check { label: "Show Bookmarks folder".into(), checked: shown, action: Act::ShowBookmarks },
         );
         let history = form.add(
-            Rect::new(250, by, 140, 24),
+            Rect::new(150, by, 150, 24),
             Widget::Check { label: "Show History folder".into(), checked: model.library.tree.items.iter().any(Item::is_history), action: Act::ShowHistory },
         );
+        button(&mut form, WIDTH - 3 * BUTTON.0 - 22, by, "Apply", Act::Apply, false);
         button(&mut form, WIDTH - 2 * BUTTON.0 - 16, by, "OK", Act::Ok, true);
         button(&mut form, WIDTH - BUTTON.0 - 10, by, "Cancel", Act::Close, false);
         form.h = by + BUTTON.1 + 10;
@@ -323,6 +324,12 @@ impl FolderEditor {
                 });
             }
             Event::Clicked(Act::FolderOut) => self.change(outdent),
+            Event::Clicked(Act::Apply) => {
+                // The tree takes the edits; the editor stays open to go on.
+                self.commit();
+                let items = self.items.iter().filter(|i| !matches!(i, Item::Folder { path, .. } if path.is_empty())).cloned().collect();
+                model.library_set_tree(items);
+            }
             Event::Clicked(Act::Ok) => {
                 self.commit();
                 let items = std::mem::take(&mut self.items).into_iter().filter(|i| !matches!(i, Item::Folder { path, .. } if path.is_empty())).collect();
@@ -529,6 +536,20 @@ mod tests {
         assert!(matches!(e.form.widget(e.history), Widget::Check { checked: true, .. }));
         assert!(e.handle(Event::Toggled(Act::ShowHistory, false), &mut m));
         assert!(!e.items.iter().any(Item::is_history));
+    }
+
+    #[test]
+    fn apply_gives_the_tree_the_edits_and_keeps_the_editor_open() {
+        use crate::panels::{Panel, PanelKind};
+        let mut m = Model::for_tests();
+        m.library.tree.set_items(sample());
+        let mut p = Panel::open(PanelKind::FolderEditor, &m);
+        let Panel::Folders(e) = &mut p else { panic!() };
+        e.form.set_text(e.name, "Alpha");
+        assert!(e.handle(Event::Edited, &mut m));
+        assert!(e.handle(Event::Clicked(Act::Apply), &mut m), "still open");
+        assert_eq!(m.library.tree.items[0].label(), "Alpha");
+        assert_eq!(e.items.len(), 5, "the editor still has its rows");
     }
 
     #[test]
