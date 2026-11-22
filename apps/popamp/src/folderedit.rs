@@ -5,7 +5,7 @@
 use crate::foldertree::{clean_name, normalize, Item};
 use crate::model::Model;
 use crate::panels::{button, Act};
-use crate::widgets::{Event, Form, Rect, Widget, BUTTON, ROW_H};
+use crate::widgets::{Event, Form, Rect, Widget, BUTTON, ROW_CHILD, ROW_FOLDER, ROW_GROUP, ROW_H};
 
 const WIDTH: i32 = 570;
 const LIST_ROWS: i32 = 14;
@@ -178,9 +178,9 @@ impl FolderEditor {
     /// What a row says.
     fn row_text(items: &[Item], k: usize) -> String {
         match &items[k] {
-            Item::Group { name, .. } => format!("[{name}]"),
+            Item::Group { name, .. } => format!("{ROW_GROUP}{name}"),
             Item::Folder { path, child, .. } => {
-                let indent = if *child { "     " } else { "" };
+                let icon = if *child { ROW_CHILD } else { ROW_FOLDER };
                 let place = if crate::foldertree::is_bookmarks(path) {
                     "(your bookmarks)"
                 } else if crate::foldertree::is_history(path) {
@@ -188,7 +188,7 @@ impl FolderEditor {
                 } else {
                     path
                 };
-                format!("{indent}{}   {place}", items[k].label())
+                format!("{icon}{}   {place}", items[k].label())
             }
         }
     }

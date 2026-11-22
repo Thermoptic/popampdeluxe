@@ -817,6 +817,12 @@ fn draw_input(pen: &mut Pen, r: Rect, text: &str, cursor: usize, focused: bool) 
     }
 }
 
+/// A list row that starts with one of these draws the picture before its text.
+pub const ROW_FOLDER: char = '\x01';
+pub const ROW_GROUP: char = '\x02';
+pub const ROW_CHILD: char = '\x03';
+const FOLDER_GREEN: u32 = popamp_skin::bitmap::rgb(0x4f, 0xd0, 0x8a);
+
 fn draw_list(pen: &mut Pen, r: Rect, rows: &[String], selected: Option<usize>, scroll: usize, focused: bool) {
     sunken(pen, r, focused);
     let page = ((r.h - 4) / ROW_H) as usize;
@@ -837,8 +843,37 @@ fn draw_list(pen: &mut Pen, r: Rect, rows: &[String], selected: Option<usize>, s
                 pen.text(r.x + split, ty, &t, TEXT, r.x + split, r.w - split - 4);
             }
             None => {
-                let t = pen.fit(row, r.w - 12);
-                pen.text(r.x + 5, ty, &t, TEXT, r.x + 2, r.w - 4);
+                // A row can start with a picture: a folder, a group or the hook of a folder in a group.
+                let (icon, row) = match row.chars().next() {
+                    Some(c @ (ROW_FOLDER | ROW_GROUP | ROW_CHILD)) => (Some(c), &row[c.len_utf8()..]),
+                    _ => (None, row.as_str()),
+                };
+                let mut x = r.x + 5;
+                if let Some(icon) = icon {
+                    // A folder in a group hangs a little further in.
+                    let hang = if icon == ROW_CHILD { 12 } else { 0 };
+                    let (ix, iy) = (r.x + 6 + hang, y + (ROW_H - 6) / 2);
+                    match icon {
+                        ROW_FOLDER => {
+                            pen.fill(ix, iy, 3, 1, FOLDER_GREEN);
+                            pen.fill(ix, iy + 1, 8, 5, FOLDER_GREEN);
+                        }
+                        ROW_GROUP => {
+                            pen.fill(ix, iy, 3, 1, TEXT);
+                            pen.fill(ix, iy + 1, 8, 1, TEXT);
+                            pen.fill(ix, iy + 2, 1, 3, TEXT);
+                            pen.fill(ix + 7, iy + 2, 1, 3, TEXT);
+                            pen.fill(ix, iy + 5, 8, 1, TEXT);
+                        }
+                        _ => {
+                            pen.fill(ix + 3, iy - 1, 1, 4, FOLDER_GREEN);
+                            pen.fill(ix + 3, iy + 3, 5, 1, FOLDER_GREEN);
+                        }
+                    }
+                    x += 16 + hang;
+                }
+                let t = pen.fit(row, r.w - 12 - (x - r.x - 5));
+                pen.text(x, ty, &t, TEXT, r.x + 2, r.w - 4);
             }
         }
     }
