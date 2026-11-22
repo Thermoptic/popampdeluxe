@@ -16,6 +16,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **History log count** (Preferences > Interface): how many played tracks the History window keeps. The default is now 800, down from a fixed 5000; the range is 10 to 100000.
 - **Palettes in the Skin Browser:** a drop-down *Palette* with *Original* at the top and forty dark
   Base16 schemes (Gruvbox, Solarized, Nord, Monokai, Tomorrow Night, One Dark, Catppuccin, Dracula,
   Tokyo Night and more, from tinted-theming/schemes). Pick one with the mouse, or open the list and

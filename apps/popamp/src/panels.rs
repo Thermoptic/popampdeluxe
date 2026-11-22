@@ -576,6 +576,7 @@ pub enum Field {
     CustomFontSize,
     FontSize,
     RowGap,
+    HistoryLimit,
     TitleFormat,
     FadeMs,
     CrossfadeMs,
@@ -590,6 +591,7 @@ impl Field {
             Field::CustomFontSize => "Size",
             Field::FontSize => "Playlist font size",
             Field::RowGap => "Line spacing",
+            Field::HistoryLimit => "History log count",
             Field::TitleFormat => "Title format",
             Field::FadeMs => "Fade-out (ms)",
             Field::CrossfadeMs => "Crossfade (ms)",
@@ -604,6 +606,7 @@ impl Field {
             Field::CustomFontSize => s.font_size.to_string(),
             Field::FontSize => s.pe_fontsize.to_string(),
             Field::RowGap => s.row_gap.to_string(),
+            Field::HistoryLimit => s.history_limit.to_string(),
             Field::TitleFormat => s.titlefmt.clone(),
             Field::FadeMs => s.fade_ms.to_string(),
             Field::CrossfadeMs => s.crossfade_ms.to_string(),
@@ -618,6 +621,7 @@ impl Field {
         match self {
             Field::CustomFontSize | Field::FontSize => Some((6, 40, 1)),
             Field::RowGap => Some((0, 30, 1)),
+            Field::HistoryLimit => Some((10, 100_000, 100)),
             Field::FadeMs | Field::CrossfadeMs => Some((0, 10_000, 50)),
             Field::BufferMs => Some((40, 2000, 10)),
             Field::TitleFormat | Field::Proxy | Field::SoundFont => None,
@@ -631,6 +635,7 @@ impl Field {
             Field::CustomFontSize => number("Size"),
             Field::FontSize => number("Font size"),
             Field::RowGap => number("Line spacing"),
+            Field::HistoryLimit => number("History log count"),
             Field::FadeMs => number("Fade-out"),
             Field::CrossfadeMs => number("Crossfade"),
             Field::BufferMs => number("Output buffer"),
@@ -649,6 +654,7 @@ impl Field {
             Field::CustomFontSize => model.settings_mut().font_size = n().min(1000) as i32,
             Field::FontSize => model.settings_mut().pe_fontsize = n().min(1000) as i32,
             Field::RowGap => model.settings_mut().row_gap = n().min(30) as i32,
+            Field::HistoryLimit => model.set_history_limit(n()),
             Field::FadeMs => model.settings_mut().fade_ms = n(),
             Field::CrossfadeMs => model.settings_mut().crossfade_ms = n(),
             Field::BufferMs => model.settings_mut().buffer_ms = n(),
@@ -738,7 +744,7 @@ impl Section {
 
     fn fields(self) -> &'static [Field] {
         match self {
-            Section::Interface => &[Field::RowGap],
+            Section::Interface => &[Field::RowGap, Field::HistoryLimit],
             Section::Playlist => &[Field::FontSize, Field::TitleFormat],
             Section::Playback => &[Field::FadeMs, Field::CrossfadeMs, Field::BufferMs, Field::SoundFont],
             Section::Internet => &[Field::Proxy],
@@ -838,7 +844,7 @@ impl Preferences {
                 Section::Shortcuts => 16 + SHORTCUT_ROWS as i32 * 30,
                 Section::Hotkeys => 272,
                 Section::Font => 62,
-                Section::Interface => 28,
+                Section::Interface => 56,
                 _ => 0,
             };
             let frame = form.add_on(page, Rect::new(x0, 10, cw, 22 + rows * 22 + inside), Widget::Group { label: section.label().into() });
@@ -858,6 +864,7 @@ impl Preferences {
                 // frame with the same room to the left as the other rows.
                 let (label, input) = match f {
                     Field::RowGap => (Rect::new(x0 + 12, 17, 72, 24), Rect::new(x0 + 84, 17, 20, 24)),
+                    Field::HistoryLimit => (Rect::new(x0 + 12, 45, 120, 24), Rect::new(x0 + 132, 45, 52, 24)),
                     _ => (Rect::new(x0 + 4, y, 136, 24), Rect::new(x0 + 140, y, cw - 140, 24)),
                 };
                 form.add_on(page, label, Widget::Label { text: f.label().into(), dim: false });
@@ -1933,6 +1940,29 @@ pub(crate) mod tests {
         retype(&mut p, &mut m, Field::RowGap, "99");
         assert!(!press(&mut p, &mut m, Key::Enter));
         assert_eq!(m.settings().row_gap, 30, "kept in range");
+    }
+
+    #[test]
+    fn the_history_log_count_is_set_under_interface_and_trims_the_history() {
+        let mut m = songs(&["Alpha"]);
+        assert_eq!(m.settings().history_limit, 800, "800 plays unless changed");
+        let path = m.paths.history_file();
+        for i in 0..30 {
+            m.history.record(&path, popamp_core::history::Played { at: i, location: format!("/{i}.mp3"), title: String::new() });
+        }
+        let mut p = Panel::open(PanelKind::Preferences, &m);
+        let Panel::Prefs(pr) = &p else { unreachable!() };
+        assert_eq!(pr.form.page_of(field(&p, Field::HistoryLimit)), Section::ALL.iter().position(|&s| s == Section::Interface));
+        let Widget::Input { text, .. } = pr.form.widget(field(&p, Field::HistoryLimit)) else { panic!() };
+        assert_eq!(text, "800");
+        retype(&mut p, &mut m, Field::HistoryLimit, "12");
+        assert!(!press(&mut p, &mut m, Key::Enter));
+        assert_eq!(m.settings().history_limit, 12);
+        assert_eq!(m.history.len(), 12, "the oldest are dropped at once");
+        let mut p = Panel::open(PanelKind::Preferences, &m);
+        retype(&mut p, &mut m, Field::HistoryLimit, "1");
+        assert!(!press(&mut p, &mut m, Key::Enter));
+        assert_eq!(m.settings().history_limit, 10, "kept in range");
     }
 
     #[test]

@@ -283,6 +283,8 @@ settings! {
     /// (Preferences > Interface). 0 is the closest the lines can be, with a
     /// pixel between the capital letters; 5 is how the rows have always been.
     row_gap: i32 = 5,
+    /// How many played tracks the History window keeps (Preferences > Interface).
+    history_limit: i32 = 800,
     shownumsinpl: bool = true,
     zeropadplnum: bool = false,
     titlefmt: String = DEFAULT_TITLE_FORMAT.to_string(),
@@ -376,6 +378,7 @@ impl Settings {
         self.ml_height = self.ml_height.max(116);
         self.pe_fontsize = self.pe_fontsize.clamp(6, 40);
         self.row_gap = self.row_gap.clamp(0, 30);
+        self.history_limit = self.history_limit.clamp(10, 100_000);
         self.font_size = self.font_size.clamp(6, 40);
         self.snaplen = self.snaplen.clamp(0, 100);
         self.zoom = self.zoom.clamp(125, 300);

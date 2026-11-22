@@ -2,7 +2,8 @@
 //!
 //! Each play is one appended line, `secs<TAB>location<TAB>title`, so a
 //! crash loses at most the line being written. Loading keeps the newest
-//! [`LIMIT`] plays and rewrites the file once it holds twice that many.
+//! `limit` plays (Preferences > Interface, [`DEFAULT_LIMIT`] unless changed)
+//! and rewrites the file once it holds twice that many.
 
 use std::collections::VecDeque;
 use std::io::Write;
@@ -10,8 +11,8 @@ use std::path::Path;
 
 use crate::text::{escape_field as escape, unescape_field as unescape};
 
-/// How many plays are kept.
-pub const LIMIT: usize = 5000;
+/// How many plays are kept unless the setting says otherwise.
+pub const DEFAULT_LIMIT: usize = 800;
 
 /// One track started.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,25 +38,33 @@ impl Played {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct History {
     plays: VecDeque<Played>,
+    /// How many plays are kept.
+    limit: usize,
+}
+
+impl Default for History {
+    fn default() -> History {
+        History { plays: VecDeque::new(), limit: DEFAULT_LIMIT }
+    }
 }
 
 impl History {
-    /// The plays in `text`; broken lines are skipped.
-    pub fn parse(text: &str) -> History {
-        let mut h = History::default();
+    /// The newest `limit` plays in `text`; broken lines are skipped.
+    pub fn parse(text: &str, limit: usize) -> History {
+        let mut h = History { plays: VecDeque::new(), limit: limit.max(1) };
         text.lines().filter_map(Played::parse).for_each(|p| h.push(p));
         h
     }
 
     /// Reads `path`, compacting it when it has grown past twice the limit.
     /// A missing file is an empty history.
-    pub fn load(path: &Path) -> History {
+    pub fn load(path: &Path, limit: usize) -> History {
         let text = std::fs::read_to_string(path).unwrap_or_default();
-        let h = History::parse(&text);
-        if text.lines().count() > 2 * LIMIT {
+        let h = History::parse(&text, limit);
+        if text.lines().count() > 2 * h.limit {
             let all: String = h.plays.iter().map(Played::line).collect();
             if let Err(e) = std::fs::write(path, all) {
                 log::warn!("cannot compact {}: {e}", path.display());
@@ -73,10 +82,19 @@ impl History {
     }
 
     fn push(&mut self, played: Played) {
-        if self.plays.len() == LIMIT {
+        while self.plays.len() >= self.limit {
             self.plays.pop_front();
         }
         self.plays.push_back(played);
+    }
+
+    /// Keeps `limit` plays from now on, dropping the oldest at once if there
+    /// are more. The file shrinks the next time it is loaded.
+    pub fn set_limit(&mut self, limit: usize) {
+        self.limit = limit.max(1);
+        while self.plays.len() > self.limit {
+            self.plays.pop_front();
+        }
     }
 
     /// Newest first.
@@ -122,10 +140,10 @@ mod tests {
     #[test]
     fn plays_survive_a_restart_newest_first() {
         let path = file("restart");
-        let mut h = History::load(&path);
+        let mut h = History::load(&path, DEFAULT_LIMIT);
         h.record(&path, played(100, "/music/a.flac", "A - One"));
         h.record(&path, played(200, "http://radio.example/live", "Radio"));
-        let again = History::load(&path);
+        let again = History::load(&path, DEFAULT_LIMIT);
         let _ = std::fs::remove_dir_all(path.parent().unwrap());
         let titles: Vec<_> = again.newest_first().map(|p| (p.at, p.title.as_str())).collect();
         assert_eq!(titles, [(200, "Radio"), (100, "A - One")]);
@@ -134,13 +152,13 @@ mod tests {
     #[test]
     fn odd_characters_keep_to_their_line() {
         let odd = played(5, "/music/tab\there\\x.mp3", "line\nbreak\r and \\t");
-        let h = History::parse(&odd.line());
+        let h = History::parse(&odd.line(), DEFAULT_LIMIT);
         assert_eq!(h.newest_first().next(), Some(&odd));
     }
 
     #[test]
     fn broken_lines_are_skipped() {
-        let h = History::parse("garbage\n12\t\tno location\n7\t/a.mp3\tA\nx\t/b.mp3\tB\n8\t/c.mp3\n");
+        let h = History::parse("garbage\n12\t\tno location\n7\t/a.mp3\tA\nx\t/b.mp3\tB\n8\t/c.mp3\n", DEFAULT_LIMIT);
         let locations: Vec<_> = h.newest_first().map(|p| p.location.as_str()).collect();
         assert_eq!(locations, ["/a.mp3"]);
     }
@@ -149,12 +167,29 @@ mod tests {
     fn only_the_newest_plays_are_kept_and_the_file_is_compacted() {
         let path = file("limit");
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        let lines: String = (0..2 * LIMIT as u64 + 1).map(|i| played(i, &format!("/{i}.mp3"), "").line()).collect();
+        let limit = DEFAULT_LIMIT;
+        let lines: String = (0..2 * limit as u64 + 1).map(|i| played(i, &format!("/{i}.mp3"), "").line()).collect();
         std::fs::write(&path, lines).unwrap();
-        let h = History::load(&path);
+        let h = History::load(&path, limit);
         let kept = std::fs::read_to_string(&path).unwrap().lines().count();
         let _ = std::fs::remove_dir_all(path.parent().unwrap());
-        assert_eq!((h.len(), kept), (LIMIT, LIMIT));
-        assert_eq!(h.newest_first().next().map(|p| p.at), Some(2 * LIMIT as u64));
+        assert_eq!((h.len(), kept), (limit, limit));
+        assert_eq!(h.newest_first().next().map(|p| p.at), Some(2 * limit as u64));
+    }
+
+    #[test]
+    fn the_limit_can_be_changed_and_trims_at_once() {
+        let path = file("setlimit");
+        let mut h = History::load(&path, 5);
+        for i in 0..8 {
+            h.record(&path, played(i, &format!("/{i}.mp3"), ""));
+        }
+        assert_eq!(h.len(), 5, "kept to the limit it was loaded with");
+        h.set_limit(3);
+        assert_eq!(h.newest_first().map(|p| p.at).collect::<Vec<_>>(), [7, 6, 5]);
+        h.set_limit(100);
+        h.record(&path, played(9, "/9.mp3", ""));
+        assert_eq!(h.len(), 4, "a larger limit lets it grow again");
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
 }

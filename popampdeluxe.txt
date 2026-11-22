@@ -21,6 +21,17 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-22   HISTORY LOG COUNT
+  ..........................................................................
+
+  Preferences > Interface > History log count
+
+  The History window (Ctrl+H) keeps the last 800 tracks you played. Type
+  another number in "History log count" to keep more or fewer (10 to
+  100000). Fewer drops the oldest plays at once; more lets the list grow
+  from now on. Kept in popamp.ini.
+
+
   2026-11-22   PALETTES IN THE SKIN BROWSER
   ..........................................................................
 
@@ -33,9 +44,10 @@
   Dracula and Tokyo Night.
 
      * Click the drop-down and click a palette, or open it and move with the
-       Up and Down arrow keys (or the mouse wheel). Each palette you pass
-       is on in the player at once, so you see the colours as you go. Enter
-       closes the list.
+       Up and Down arrow keys. Each palette you pass is on in the player at
+       once, so you see the colours as you go. Enter closes the list. The
+       mouse wheel and the scroll bar of the list only scroll it; nothing
+       is picked until you click a name.
      * Pick "Original" to go back to the skin's own colours.
 
   The skin files are not changed. Popamp recolours every colour of the skin

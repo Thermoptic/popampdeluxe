@@ -260,7 +260,7 @@ impl Model {
         let eq_presets = eqf::read_file(&paths.eq_library()).unwrap_or_else(|_| eqf::builtin_presets());
         let eq_auto = eqf::read_file(&paths.eq_auto_library()).unwrap_or_default();
         let bookmarks = plformats::read_file(&paths.bookmarks_file()).unwrap_or_default();
-        let history = History::load(&paths.history_file());
+        let history = History::load(&paths.history_file(), config.settings.history_limit.clamp(10, 100_000) as usize);
         let scanned = Arc::new(Scanned::load(&paths.replaygain_file()));
         let format = Format::cached(&config.settings.titlefmt);
         let library = crate::library::LibraryPane::new(popamp_core::library::Library::load(&paths.library_file()));
@@ -503,6 +503,13 @@ impl Model {
             }
             self.pl_dirty += 1;
         }
+    }
+
+    /// How many plays the History window keeps; fewer drops the oldest now.
+    pub fn set_history_limit(&mut self, n: u32) {
+        let n = n.clamp(10, 100_000);
+        self.settings_mut().history_limit = n as i32;
+        self.history.set_limit(n as usize);
     }
 
     pub fn set_title_format(&mut self, fmt: &str) {
