@@ -51,6 +51,8 @@ pub enum Act {
     FolderDown,
     FolderIn,
     FolderOut,
+    /// The Folder and Group Editor: the Bookmarks folder is in the left list.
+    ShowBookmarks,
     /// Preferences > Hotkeys: give the picked shortcut other keys, more keys, none, or its own again.
     HotkeyChange,
     HotkeyAdd,

@@ -43,6 +43,15 @@ pub struct Entry {
     pub modified: Option<SystemTime>,
 }
 
+/// The path of the Bookmarks folder in the left list: no real folder, the
+/// player's bookmarks, which are listed in the right list when it is picked.
+pub const BOOKMARKS: &str = "popamp:bookmarks";
+
+/// Whether `path` is the Bookmarks folder.
+pub fn is_bookmarks(path: &str) -> bool {
+    path == BOOKMARKS
+}
+
 /// A line of the left list: a group, or a folder that may be in a group.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Item {
@@ -65,6 +74,11 @@ impl Item {
             Item::Folder { name, .. } if !name.is_empty() => name.clone(),
             Item::Folder { path, .. } => label(path),
         }
+    }
+
+    /// Whether this is the Bookmarks folder.
+    pub fn is_bookmarks(&self) -> bool {
+        matches!(self, Item::Folder { path, .. } if is_bookmarks(path))
     }
 
     /// The line it is kept as in the ini file: `group|1|Name` (1: unfolded)
@@ -119,6 +133,9 @@ pub struct FolderTree {
     pub items: Vec<Item>,
     /// The picked folder, by its place in `items`.
     root: Option<usize>,
+    /// The player's bookmarks, as the right list shows them when the Bookmarks
+    /// folder is picked: where each is, and how it is written.
+    bookmarks: Vec<(String, String)>,
     /// The row of the left list last clicked (a group too), by its place in
     /// `items`: while that list has the focus, Play and Enqueue take all it holds.
     left: Option<usize>,
@@ -157,6 +174,9 @@ pub fn path_label(path: &str) -> String {
 
 /// The name of the last part of `path`.
 fn label(path: &str) -> String {
+    if is_bookmarks(path) {
+        return "Bookmarks".into();
+    }
     Path::new(path).file_name().map_or_else(|| path.to_string(), |n| n.to_string_lossy().into_owned())
 }
 
@@ -200,6 +220,20 @@ impl FolderTree {
                 self.reload();
             }
         }
+    }
+
+    /// The bookmarks of the player; the right list shows them while the
+    /// Bookmarks folder is on screen.
+    pub fn set_bookmarks(&mut self, list: Vec<(String, String)>) {
+        let showing = self.showing_bookmarks();
+        self.bookmarks = list;
+        if showing {
+            self.reload();
+        }
+    }
+
+    fn showing_bookmarks(&self) -> bool {
+        self.dir.as_deref().and_then(Path::to_str).is_some_and(is_bookmarks)
     }
 
     /// Whether any folder is added.
@@ -320,7 +354,12 @@ impl FolderTree {
     pub fn reload(&mut self) {
         self.entries.clear();
         self.unreadable = false;
-        if let Some(dir) = self.dir.clone() {
+        if self.showing_bookmarks() {
+            for (location, text) in &self.bookmarks {
+                let entry = Entry { name: text.clone(), file: text.clone(), path: location.clone(), dir: false, up: false, modified: None };
+                self.entries.push(entry);
+            }
+        } else if let Some(dir) = self.dir.clone() {
             match std::fs::read_dir(&dir) {
                 Ok(read) => {
                     for e in read.flatten() {
@@ -349,7 +388,7 @@ impl FolderTree {
             }
         }
         self.order();
-        let above = self.dir.as_deref().filter(|d| self.folder().map(Path::new) != Some(*d)).and_then(Path::parent);
+        let above = self.dir.as_deref().filter(|d| !self.showing_bookmarks() && self.folder().map(Path::new) != Some(*d)).and_then(Path::parent);
         if let Some(parent) = above {
             let up = Entry { name: "..".into(), file: "..".into(), path: parent.to_string_lossy().into_owned(), dir: true, up: true, modified: None };
             self.entries.insert(0, up);
@@ -403,6 +442,7 @@ impl FolderTree {
         // the folders of the group clicked.
         if self.focus == Some(List::Views) {
             match self.left.and_then(|i| self.items.get(i).map(|it| (i, it))) {
+                Some((_, Item::Folder { path, .. })) if is_bookmarks(path) => return self.bookmarks.iter().map(|b| b.0.clone()).collect(),
                 Some((_, Item::Folder { path, .. })) => return vec![path.clone()],
                 Some((i, Item::Group { .. })) => {
                     return self.items[i + 1..]
@@ -563,7 +603,7 @@ impl FolderTree {
         let s = p.search;
         pen.b.fill(s.x, s.y, s.w, s.h, line);
         pen.b.fill(s.x + 1, s.y + 1, s.w - 2, s.h - 2, c.normal_bg);
-        let path = self.dir.as_ref().map(|d| d.to_string_lossy().into_owned()).unwrap_or_default();
+        let path = if self.showing_bookmarks() { "Bookmarks".to_string() } else { self.dir.as_ref().map(|d| d.to_string_lossy().into_owned()).unwrap_or_default() };
         pen.left(rect(s.x + 1, s.y + 1, s.w - 2, s.h - 2), &path, dim);
 
         self.draw_entries(&mut pen, &p, c, active, playing);
@@ -1045,6 +1085,25 @@ mod tests {
         t.press_right(AT, p.table.rows.x + 20, p.table.rows.y + p.row_h + 2);
         assert_eq!(t.picked().iter().map(|p| label(p)).collect::<Vec<_>>(), ["a.mp3"]);
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn the_bookmarks_folder_lists_the_bookmarks_and_plays_them() {
+        let lines = vec!["folder|0|Bookmarks|popamp:bookmarks".to_string()];
+        let mut t = FolderTree::from_lines(&lines);
+        t.hide_ext = true;
+        t.set_bookmarks(vec![("/music/a.mp3".into(), "Alpha".into()), ("http://radio:8000/live".into(), "Radio".into())]);
+        assert_eq!(t.items[0].label(), "Bookmarks");
+        assert_eq!(names(&t), ["Alpha", "Radio"], "no `..`: it is no folder");
+        assert!(t.entries.iter().all(|e| !e.dir && !e.up));
+        // Right-click the folder in the left list: Play and Enqueue take every bookmark.
+        let p = Parts::new(AT, false);
+        t.press_right(AT, p.views.x + 5, p.views.y + 2);
+        assert_eq!(t.picked(), ["/music/a.mp3", "http://radio:8000/live"]);
+        // A bookmark made later shows at once.
+        t.set_bookmarks(vec![("/music/b.mp3".into(), "Beta".into())]);
+        assert_eq!(names(&t), ["Beta"]);
+        assert_eq!(t.lines(), ["folder|0|Bookmarks|popamp:bookmarks"], "kept like a folder in the ini file");
     }
 
     #[test]

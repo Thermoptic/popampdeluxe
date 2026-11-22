@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Bookmarks folder in the Media Library's folder tree.** In the Folder and Group Editor,
+  the box *Show Bookmarks folder* puts a folder called Bookmarks in the left list, among the
+  groups and folders, to move, put in a group or take out like the others; unticking it hides
+  the folder again. Picking it in the Media Library shows all the bookmarks of the player
+  (Alt+I) in the right list, and Play and Enqueue work on them as on any song. A bookmark made
+  or removed shows at once.
 - `tools/wsz2psz.py` converts a classic Winamp 2 skin (`.wsz` or a folder) to a vector
   skin (`.psz`): every bitmap becomes an SVG sheet of flat-coloured areas, and the
   playlist colours and the visualizer colours are carried over. Rendered at x1 the result

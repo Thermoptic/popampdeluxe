@@ -16,6 +16,8 @@ pub struct FolderEditor {
     list: usize,
     name: usize,
     path: usize,
+    /// The box that shows or hides the Bookmarks folder.
+    bookmarks: usize,
     /// The groups and folders being edited; they replace the tree on OK.
     pub(crate) items: Vec<Item>,
     /// The row whose name and path the two fields hold.
@@ -151,10 +153,15 @@ impl FolderEditor {
         form.add(Rect::new(10, y + 30, 60, 24), Widget::Label { text: "Path:".into(), dim: false });
         let path = form.add(Rect::new(74, y + 30, WIDTH - 84, 24), Widget::Input { text: String::new(), cursor: 0 });
         let by = y + 66;
+        let shown = model.library.tree.items.iter().any(Item::is_bookmarks);
+        let bookmarks = form.add(
+            Rect::new(10, by, 230, 24),
+            Widget::Check { label: "Show Bookmarks folder".into(), checked: shown, action: Act::ShowBookmarks },
+        );
         button(&mut form, WIDTH - 2 * BUTTON.0 - 16, by, "OK", Act::Ok, true);
         button(&mut form, WIDTH - BUTTON.0 - 10, by, "Cancel", Act::Close, false);
         form.h = by + BUTTON.1 + 10;
-        let mut editor = FolderEditor { form, list, name, path, items: model.library.tree.items.clone(), shown: None, held: None };
+        let mut editor = FolderEditor { form, list, name, path, bookmarks, items: model.library.tree.items.clone(), shown: None, held: None };
         let first = editor.items.iter().position(Item::is_folder).or(if editor.items.is_empty() { None } else { Some(0) });
         editor.refresh(first);
         editor.load(first);
@@ -167,13 +174,16 @@ impl FolderEditor {
             Item::Group { name, .. } => format!("[{name}]"),
             Item::Folder { path, child, .. } => {
                 let indent = if *child { "     " } else { "" };
-                format!("{indent}{}   {path}", items[k].label())
+                let place = if crate::foldertree::is_bookmarks(path) { "(your bookmarks)" } else { path };
+                format!("{indent}{}   {place}", items[k].label())
             }
         }
     }
 
     /// Writes the list again, with row `select` picked.
     fn refresh(&mut self, select: Option<usize>) {
+        let shown = self.items.iter().any(Item::is_bookmarks);
+        self.form.set_checked(self.bookmarks, shown);
         let rows = (0..self.items.len()).map(|k| Self::row_text(&self.items, k)).collect();
         self.form.set_rows(self.list, rows, select);
     }
@@ -183,6 +193,7 @@ impl FolderEditor {
         self.shown = k.filter(|&k| k < self.items.len());
         let (name, path) = match self.shown.map(|k| &self.items[k]) {
             Some(it @ Item::Group { .. }) => (it.label(), String::new()),
+            Some(it @ Item::Folder { .. }) if it.is_bookmarks() => (it.label(), String::from("(the players bookmarks)")),
             Some(it @ Item::Folder { path, .. }) => (it.label(), path.clone()),
             None => (String::new(), String::new()),
         };
@@ -201,7 +212,10 @@ impl FolderEditor {
                 }
             }
             Item::Folder { path: old_path, name: old, .. } => {
-                *old_path = path;
+                // The Bookmarks folder has no path to change.
+                if !crate::foldertree::is_bookmarks(old_path) {
+                    *old_path = path;
+                }
                 let own = crate::foldertree::path_label(old_path);
                 *old = if name == own { String::new() } else { name };
             }
@@ -229,6 +243,20 @@ impl FolderEditor {
             Event::Edited => {
                 self.commit();
                 self.refresh_keep();
+            }
+            Event::Toggled(Act::ShowBookmarks, on) => {
+                self.commit();
+                if on && !self.items.iter().any(Item::is_bookmarks) {
+                    let at = self.items.len();
+                    self.items.push(Item::Folder { path: crate::foldertree::BOOKMARKS.into(), name: "Bookmarks".into(), child: false });
+                    self.picked(at);
+                } else if !on {
+                    self.items.retain(|i| !i.is_bookmarks());
+                    normalize(&mut self.items);
+                    let k = self.selected().unwrap_or(0).min(self.items.len().saturating_sub(1));
+                    self.refresh((!self.items.is_empty()).then_some(k));
+                    self.load((!self.items.is_empty()).then_some(k));
+                }
             }
             Event::Clicked(Act::FolderAdd) => {
                 self.commit();
@@ -419,6 +447,36 @@ mod tests {
         assert_eq!(m.library.tree.items[0].label(), "Alpha");
         assert_eq!(m.library.tree.items.len(), 6);
         assert_eq!(m.config.folder_tree().map(|l| l.len()), Some(6), "kept in the ini file");
+    }
+
+    #[test]
+    fn the_show_bookmarks_box_puts_the_bookmarks_folder_in_the_list_or_takes_it_out() {
+        use crate::panels::{Panel, PanelKind};
+        let mut m = Model::for_tests();
+        m.library.tree.set_items(sample());
+        let mut p = Panel::open(PanelKind::FolderEditor, &m);
+        let Panel::Folders(e) = &mut p else { panic!() };
+        let n = e.items.len();
+        assert!(!e.items.iter().any(Item::is_bookmarks), "not there at first");
+        assert!(e.handle(Event::Toggled(Act::ShowBookmarks, true), &mut m));
+        assert_eq!(e.items.len(), n + 1);
+        assert!(e.items.last().is_some_and(Item::is_bookmarks), "at the end, like any folder, to be moved as the others");
+        assert_eq!(e.items.last().map(Item::label), Some("Bookmarks".to_string()));
+        // Moved up like a folder.
+        let at = e.items.len() - 1;
+        e.items.swap(at - 1, at);
+        // OK: the library's left list has it.
+        assert!(!e.handle(Event::Clicked(Act::Ok), &mut m));
+        assert!(m.library.tree.items.iter().any(Item::is_bookmarks));
+        assert_eq!(m.config.folder_tree().map(|l| l.iter().any(|x| x.ends_with("|popamp:bookmarks"))), Some(true), "kept in the ini file");
+        // Open again: the box is ticked; take it away and OK.
+        let mut p = Panel::open(PanelKind::FolderEditor, &m);
+        let Panel::Folders(e) = &mut p else { panic!() };
+        assert!(matches!(e.form.widget(e.bookmarks), Widget::Check { checked: true, .. }));
+        assert!(e.handle(Event::Toggled(Act::ShowBookmarks, false), &mut m));
+        assert!(!e.items.iter().any(Item::is_bookmarks));
+        assert!(!e.handle(Event::Clicked(Act::Ok), &mut m));
+        assert!(!m.library.tree.items.iter().any(Item::is_bookmarks), "hidden again");
     }
 
     #[test]

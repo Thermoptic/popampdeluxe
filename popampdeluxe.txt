@@ -21,6 +21,27 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-22   BOOKMARKS FOLDER IN THE MEDIA LIBRARY
+  ..........................................................................
+
+  Media Library Foldertree: the bookmarks you have made (Alt+I, or the
+  Bookmarks submenu of the main menu) can have a folder of their own in the
+  left column.
+
+     1. Open the Folder and Group Editor (LIST button > "Folders and
+        groups..."), and tick "Show Bookmarks folder" at the bottom.
+     2. A folder named "Bookmarks" is added to the list. Move it where you
+        want it, with Move up and down, drag it, or put it in a group, as
+        with any folder. OK keeps it.
+     3. In the Media Library, pick Bookmarks in the left column: all your
+        bookmarks are in the right list. Double-click one, or Play and
+        Enqueue work on them as on songs; right-click the folder and
+        Enqueue adds all the bookmarks.
+
+  Untick the box to hide the folder again. The bookmarks themselves are
+  not touched. A bookmark you add or remove shows in the list at once.
+
+
   2026-11-22   ENQUEUE A WHOLE FOLDER IN THE MEDIA LIBRARY
   ..........................................................................
 

@@ -269,6 +269,7 @@ impl Model {
         };
         library.tree_mode = config.settings.ml_foldertree;
         library.tree.hide_ext = config.settings.ml_hide_ext;
+        library.tree.set_bookmarks(bookmarks.iter().map(|b| (b.location.clone(), bookmark_label(b))).collect());
         let skin = Skin::builtin_vector(Some(&config.settings.skin_colors));
         let keymap = crate::keymap::Keymap::load(|id| config.hotkey(id));
         let mut m = Model {
@@ -827,6 +828,7 @@ impl Model {
         }
         self.bookmarks.extend(plformats::items_from_entries(entries));
         self.save_bookmarks();
+        self.show_bookmarks_in_library();
         self.flash(if entries.len() == 1 { "BOOKMARK ADDED".to_string() } else { format!("{} BOOKMARKS ADDED", entries.len()) });
     }
 
@@ -834,7 +836,15 @@ impl Model {
         if i < self.bookmarks.len() {
             self.bookmarks.remove(i);
             self.save_bookmarks();
+            self.show_bookmarks_in_library();
         }
+    }
+
+    /// Gives the Media Library's Bookmarks folder the bookmarks as they are now.
+    fn show_bookmarks_in_library(&mut self) {
+        let list = self.bookmarks.iter().map(|b| (b.location.clone(), bookmark_label(b))).collect();
+        self.library.tree.set_bookmarks(list);
+        self.pl_dirty += 1;
     }
 
     fn save_bookmarks(&self) {
@@ -2352,6 +2362,22 @@ mod tests {
         m.on_dialog(DialogResult { kind: DialogKind::SaveHtml, values: vec![path.to_string_lossy().into_owned()] });
         let html = std::fs::read_to_string(path.with_extension("html")).unwrap();
         assert!(html.contains("<li>Song 2 <span>(?)</span></li>"));
+    }
+
+    #[test]
+    fn the_libraries_bookmarks_folder_follows_the_bookmarks() {
+        let mut m = Model::for_tests();
+        m.library.tree.set_items(vec![crate::foldertree::Item::Folder {
+            path: crate::foldertree::BOOKMARKS.into(),
+            name: String::new(),
+            child: false,
+        }]);
+        m.add_now(vec!["/music/1.mp3".into(), "/music/2.mp3".into()], AddMode::Append);
+        m.playlist.select_only(1);
+        m.exec(Command::BookmarkSelected);
+        assert_eq!(m.library.tree.jump_rows().len(), 1, "the bookmark is in the Bookmarks folder at once");
+        m.remove_bookmark(0);
+        assert!(m.library.tree.jump_rows().is_empty());
     }
 
     #[test]
