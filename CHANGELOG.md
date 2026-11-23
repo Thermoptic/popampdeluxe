@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- With "Minimize to the tray" on, minimizing the player from the taskbar button (or Win+D) now hides it into the tray like its own minimize button does: no taskbar button is left, only the tray icon.
+
 ## [1.1.0] - 2026-11-22
 
 ### Added

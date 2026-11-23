@@ -2243,6 +2243,17 @@ impl ApplicationHandler<AppEvent> for App {
                 }
                 self.render(k);
             }
+            // Minimized by the system (the taskbar button, Win+D): with "Minimize to
+            // the tray" on, that is the same as the player's own button: the windows
+            // hide, and the taskbar has no button, only the tray its icon.
+            WindowEvent::Resized(_)
+                if k == WindowKey::Main
+                    && self.model.settings().minimize_to_tray
+                    && !self.model.in_tray
+                    && self.win(k).and_then(|w| w.window.top()).and_then(|w| w.is_minimized()) == Some(true) =>
+            {
+                self.run(el, Command::Minimize);
+            }
             WindowEvent::Moved(p) => {
                 let factor = self.win(k).map_or(1.0, |w| w.window.scale_factor());
                 let p = {
