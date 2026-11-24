@@ -821,11 +821,18 @@ impl App {
     }
 
     fn open_panel(&mut self, el: &ActiveEventLoop, kind: PanelKind) {
-        if let Some(p) = self.panels.iter().find(|p| p.panel.kind() == kind) {
-            p.window.focus_window();
+        let library = kind == PanelKind::Preferences && std::mem::take(&mut self.model.prefs_library);
+        if let Some(i) = self.panels.iter().position(|p| p.panel.kind() == kind) {
+            if library {
+                self.panels[i].panel.show_library_page();
+                self.render_panel(i);
+            }
+            self.panels[i].window.focus_window();
             return;
         }
+        self.model.prefs_library = library;
         let panel = Panel::open(kind, &self.model);
+        self.model.prefs_library = false;
         let pct = self.dialog_pct();
         let (w, h) = (crate::pen::screen(pct, panel.form().w), crate::pen::screen(pct, panel.form().h));
         // Centred on the main window's monitor, so the title bar is on screen.

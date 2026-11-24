@@ -21,6 +21,18 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-24   SAVE QUICK PLAYLIST
+  ..........................................................................
+
+  Playlist window > right-click > Save Quick Playlist
+
+  Saves the playlist at once as an .m3u file in the Default Playlist
+  Location, named Playlist_<tracks>tracks_<date>.m3u, for example
+  Playlist_14tracks_24-11-2026.m3u. The same name twice gets _2, _3 and so
+  on, so nothing is overwritten. If no location is set, Preferences opens
+  on the Media Library page, where you set it.
+
+
   2026-11-24   DEFAULT PLAYLIST LOCATION
   ..........................................................................
 

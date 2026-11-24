@@ -141,6 +141,8 @@ pub struct Model {
     pub library: crate::library::LibraryPane,
     pub vis: Vis,
     pub ui: Vec<UiReq>,
+    /// Preferences opens on its Media Library page (set by Save Quick Playlist with no folder to save in).
+    pub prefs_library: bool,
     /// The windows are hidden; the tray icon is there to bring them back.
     pub in_tray: bool,
     pub quit: bool,
@@ -313,6 +315,7 @@ impl Model {
             vis: Vis::new(),
             ui: Vec::new(),
             in_tray: false,
+            prefs_library: false,
             quit: false,
             events,
             meta_tx,
@@ -528,6 +531,35 @@ impl Model {
         let f = self.format.clone();
         self.playlist.refresh_all_displays(&f);
         self.pl_dirty += 1;
+    }
+
+    /// "Save Quick Playlist": writes the playlist as `Playlist_<n>tracks_<dd-mm-yyyy>.m3u`
+    /// in the Default Playlist Location. With none set, Preferences opens on the
+    /// page where it is set.
+    pub fn save_quick_playlist(&mut self) {
+        let Some(dir) = self.playlist_dir() else {
+            self.prefs_library = true;
+            self.ui.push(UiReq::Panel(PanelKind::Preferences));
+            return;
+        };
+        let n = self.playlist.len();
+        if n == 0 {
+            return self.flash("THE PLAYLIST IS EMPTY");
+        }
+        let date = jiff::Zoned::now().strftime("%d-%m-%Y").to_string();
+        let base = format!("Playlist_{n}tracks_{date}");
+        // A list saved the same day with as many tracks is not overwritten.
+        let mut path = dir.join(format!("{base}.m3u"));
+        for k in 2.. {
+            if !path.exists() {
+                break;
+            }
+            path = dir.join(format!("{base}_{k}.m3u"));
+        }
+        match self.save_playlist_file(&path) {
+            Ok(()) => self.flash(format!("SAVED {}", path.file_name().unwrap_or_default().to_string_lossy().to_uppercase())),
+            Err(e) => self.flash(format!("SAVE FAILED: {e}")),
+        }
     }
 
     pub fn save_playlist_file(&self, path: &Path) -> std::io::Result<()> {
@@ -1383,6 +1415,7 @@ impl Model {
             C::LibraryEditFolders => self.ui.push(UiReq::Panel(PanelKind::FolderEditor)),
             C::FileInfo => self.ui.push(UiReq::Panel(PanelKind::FileInfo)),
             C::PlGenerateHtml => self.request_dialog(DialogKind::SaveHtml),
+            C::PlSaveQuick => self.save_quick_playlist(),
             C::PlCopyToClipboard => self.copy_playlist_to_clipboard(),
             C::EqLoadDefault => {
                 let p = self.settings().eq_default();
@@ -1953,6 +1986,8 @@ impl Model {
             MenuItem::cmd("Bookmark item(s)", "Alt+I", C::BookmarkSelected),
             MenuItem::cmd("Scan ReplayGain", "", C::ScanReplayGain),
             MenuItem::cmd("Copy to clipboard", "", C::PlCopyToClipboard),
+            MenuItem::sep(),
+            MenuItem::cmd("Save Quick Playlist", "", C::PlSaveQuick),
             MenuItem::sep(),
             MenuItem::sub("Sort", self.sort_menu()),
         ]

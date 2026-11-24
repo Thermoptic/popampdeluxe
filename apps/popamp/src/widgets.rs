@@ -232,6 +232,19 @@ impl<A: Copy + PartialEq> Form<A> {
         self.pages[i]
     }
 
+    /// Picks segment `n` of the (first) list of pages, as a click on it would.
+    pub fn select_page(&mut self, n: usize) {
+        for (_, w) in &mut self.controls {
+            if let Widget::Pages { labels, selected, .. } = w {
+                if n < labels.len() {
+                    *selected = n;
+                    self.show_page(n);
+                }
+                return;
+            }
+        }
+    }
+
     /// Shows `page`; the keyboard goes to its first field or list when it
     /// was on another page.
     fn show_page(&mut self, page: usize) {

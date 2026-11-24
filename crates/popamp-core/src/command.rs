@@ -130,6 +130,7 @@ commands! {
     LibraryEditFolders = 50044,
     ToggleAllShades = 50045,
     LibraryJump = 50046,
+    PlSaveQuick = 50047,
 }
 
 #[cfg(test)]

@@ -117,13 +117,19 @@ impl Panel {
             PanelKind::JumpToFile => Panel::Jump(JumpToFile::new(model)),
             PanelKind::LibraryJump => Panel::LibJump(LibraryJump::new(model)),
             PanelKind::FileInfo => Panel::Info(FileInfo::new(model)),
-            PanelKind::Preferences => Panel::Prefs(Preferences::new(
-                model.settings(),
-                popamp_audio::output::devices(),
-                FileTypes::from_env(),
-                crate::font::installed(&model.paths.fonts_dirs()),
-                &model.keymap,
-            )),
+            PanelKind::Preferences => {
+                let mut p = Panel::Prefs(Preferences::new(
+                    model.settings(),
+                    popamp_audio::output::devices(),
+                    FileTypes::from_env(),
+                    crate::font::installed(&model.paths.fonts_dirs()),
+                    &model.keymap,
+                ));
+                if model.prefs_library {
+                    p.show_library_page();
+                }
+                p
+            }
             #[cfg(feature = "plugins")]
             PanelKind::Plugins => Panel::Plugins(crate::plugins::PluginsPanel::new(model)),
             PanelKind::SkinMuseum => Panel::Museum(SkinMuseum::new()),
@@ -310,6 +316,13 @@ impl Panel {
             Panel::Scan(p) => p.refresh(model),
             Panel::Prefs(p) => p.refresh(model),
             _ => false,
+        }
+    }
+
+    /// Preferences shows its Media Library page.
+    pub fn show_library_page(&mut self) {
+        if let Panel::Prefs(p) = self {
+            p.form.select_page(Section::ALL.iter().position(|&s| s == Section::Library).unwrap_or(0));
         }
     }
 
@@ -1747,6 +1760,34 @@ pub(crate) mod tests {
         let Panel::Prefs(pr) = &mut p else { panic!() };
         pr.form.set_text(i, "/no/such/folder/here");
         assert!(p.handle(Event::Clicked(Act::Ok), &mut m), "kept open with the problem shown");
+    }
+
+    #[test]
+    fn save_quick_playlist_names_the_file_and_asks_for_the_folder_when_there_is_none() {
+        use popamp_core::command::Command;
+        let mut m = songs(&["Alpha", "Beta", "Gamma"]);
+        m.exec(Command::PlSaveQuick);
+        assert!(m.prefs_library, "no folder: Preferences opens on the Media Library page");
+        assert!(matches!(m.ui.last(), Some(UiReq::Panel(PanelKind::Preferences))));
+        let mut p = Panel::open(PanelKind::Preferences, &m);
+        let Panel::Prefs(pr) = &p else { panic!() };
+        assert_eq!(pr.form.shown_page(), Section::ALL.iter().position(|&s| s == Section::Library).unwrap());
+        m.prefs_library = false;
+        p.show_library_page();
+        let dir = std::env::temp_dir().join(format!("popamp-quick-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        m.settings_mut().playlist_dir = dir.to_string_lossy().into_owned();
+        m.exec(Command::PlSaveQuick);
+        m.exec(Command::PlSaveQuick);
+        let mut names: Vec<String> = std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect();
+        names.sort();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(names.len(), 2, "the second does not overwrite the first: {names:?}");
+        assert!(names[0].starts_with("Playlist_3tracks_") && names[0].ends_with(".m3u"), "{names:?}");
+        let date = &names[0]["Playlist_3tracks_".len()..names[0].len() - 4];
+        assert_eq!(date.len(), 10, "dd-mm-yyyy: {date}");
+        assert!(!names[0].contains(' '));
     }
 
     #[test]

@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Save Quick Playlist** in the playlist's right-click menu: saves the playlist as `Playlist_<tracks>tracks_<dd-mm-yyyy>.m3u` (for example `Playlist_14tracks_24-11-2026.m3u`) in the Default Playlist Location, without asking. With no location set, Preferences opens on the Media Library page to set it.
+
+### Added
+
 - **Default Playlist Location** (Preferences > Media Library): a Set folder button opens the system's folder dialog, and the chosen path shows in the field beside it (it can be typed too). The Load playlist and Save playlist dialogs start in that folder.
 
 ## [1.1.0] - 2026-11-22
