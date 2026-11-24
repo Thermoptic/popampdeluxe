@@ -285,6 +285,8 @@ settings! {
     row_gap: i32 = 5,
     /// How many played tracks the History window keeps (Preferences > Interface).
     history_limit: i32 = 800,
+    /// Where the Load and Save playlist dialogs start (Preferences > Media Library); empty: where the last file was.
+    playlist_dir: String = String::new(),
     shownumsinpl: bool = true,
     zeropadplnum: bool = false,
     titlefmt: String = DEFAULT_TITLE_FORMAT.to_string(),

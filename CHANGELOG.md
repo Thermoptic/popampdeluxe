@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Default Playlist Location** (Preferences > Media Library): a Set folder button opens the system's folder dialog, and the chosen path shows in the field beside it (it can be typed too). The Load playlist and Save playlist dialogs start in that folder.
+
 ## [1.1.0] - 2026-11-22
 
 ### Added

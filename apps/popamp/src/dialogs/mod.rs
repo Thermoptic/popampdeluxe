@@ -67,6 +67,8 @@ pub enum DialogKind {
         play: bool,
     },
     LoadPlaylist,
+    /// The folder the playlist dialogs start in (Preferences > Media Library).
+    PlaylistFolder,
     /// A folder to take into the media library.
     LibraryFolder,
     SavePlaylist,

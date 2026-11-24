@@ -1022,6 +1022,12 @@ impl Model {
         })
     }
 
+    /// The folder set as the default for playlists, when it is there.
+    fn playlist_dir(&self) -> Option<PathBuf> {
+        let dir = PathBuf::from(self.settings().playlist_dir.trim());
+        (!self.settings().playlist_dir.trim().is_empty() && dir.is_dir()).then_some(dir)
+    }
+
     pub fn request_dialog(&mut self, kind: DialogKind) {
         let own = popamp_core::audio_extensions().chain(["m3u", "m3u8", "pls", "xspf", "cue"]).map(|e| format!("*.{e}"));
         let media_filter: Vec<String> = own.chain(self.decoders.extensions().iter().map(|e| format!("*.{e}"))).collect();
@@ -1039,9 +1045,12 @@ impl Model {
                 title: "Load playlist".into(),
                 multiple: false,
                 filter: ["*.m3u", "*.m3u8", "*.pls", "*.xspf"].map(String::from).to_vec(),
-                start,
+                start: self.playlist_dir().or(start),
             },
-            DialogKind::SavePlaylist => Request::Save { title: "Save playlist".into(), name: "playlist.m3u8".into(), start },
+            DialogKind::SavePlaylist => {
+                Request::Save { title: "Save playlist".into(), name: "playlist.m3u8".into(), start: self.playlist_dir().or(start) }
+            }
+            DialogKind::PlaylistFolder => Request::Folder { title: "Default playlist location".into(), start: self.playlist_dir().or(start) },
             DialogKind::SaveHtml => Request::Save { title: "Generate HTML playlist".into(), name: "playlist.html".into(), start },
             DialogKind::JumpToTime => {
                 let len = self.engine.shared().length_ms().map(format_duration_ms).unwrap_or_else(|| "?".into());
@@ -1257,6 +1266,11 @@ impl Model {
             DialogKind::InstallSkin => {
                 if let Some(f) = first {
                     self.install_skin(Path::new(&f));
+                }
+            }
+            DialogKind::PlaylistFolder => {
+                if let Some(f) = first.map(|f| f.trim().to_string()).filter(|f| !f.is_empty()) {
+                    self.settings_mut().playlist_dir = f;
                 }
             }
             DialogKind::LibraryFolder => {

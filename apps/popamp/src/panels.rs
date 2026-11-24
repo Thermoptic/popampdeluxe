@@ -55,6 +55,8 @@ pub enum Act {
     ShowBookmarks,
     /// The Folder and Group Editor: the History folder is in the left list.
     ShowHistory,
+    /// Preferences > Media Library: pick the folder playlists are loaded from and saved to.
+    SetPlaylistFolder,
     /// Preferences > Hotkeys: give the picked shortcut other keys, more keys, none, or its own again.
     HotkeyChange,
     HotkeyAdd,
@@ -306,6 +308,7 @@ impl Panel {
             Panel::Skins(p) => p.refresh(model),
             Panel::History(p) => p.refresh(model),
             Panel::Scan(p) => p.refresh(model),
+            Panel::Prefs(p) => p.refresh(model),
             _ => false,
         }
     }
@@ -584,6 +587,7 @@ pub enum Field {
     FontSize,
     RowGap,
     HistoryLimit,
+    PlaylistDir,
     TitleFormat,
     FadeMs,
     CrossfadeMs,
@@ -599,6 +603,7 @@ impl Field {
             Field::FontSize => "Playlist font size",
             Field::RowGap => "Line spacing",
             Field::HistoryLimit => "History log count",
+            Field::PlaylistDir => "Default Playlist Location",
             Field::TitleFormat => "Title format",
             Field::FadeMs => "Fade-out (ms)",
             Field::CrossfadeMs => "Crossfade (ms)",
@@ -614,6 +619,7 @@ impl Field {
             Field::FontSize => s.pe_fontsize.to_string(),
             Field::RowGap => s.row_gap.to_string(),
             Field::HistoryLimit => s.history_limit.to_string(),
+            Field::PlaylistDir => s.playlist_dir.clone(),
             Field::TitleFormat => s.titlefmt.clone(),
             Field::FadeMs => s.fade_ms.to_string(),
             Field::CrossfadeMs => s.crossfade_ms.to_string(),
@@ -631,7 +637,7 @@ impl Field {
             Field::HistoryLimit => Some((10, 100_000, 100)),
             Field::FadeMs | Field::CrossfadeMs => Some((0, 10_000, 50)),
             Field::BufferMs => Some((40, 2000, 10)),
-            Field::TitleFormat | Field::Proxy | Field::SoundFont => None,
+            Field::TitleFormat | Field::Proxy | Field::SoundFont | Field::PlaylistDir => None,
         }
     }
 
@@ -650,7 +656,10 @@ impl Field {
             Field::SoundFont if !text.trim().is_empty() && !std::path::Path::new(text.trim()).is_file() => {
                 Err("MIDI SoundFont: no such file (leave it empty for the system's)".into())
             }
-            Field::TitleFormat | Field::Proxy | Field::SoundFont => Ok(()),
+            Field::PlaylistDir if !text.trim().is_empty() && !std::path::Path::new(text.trim()).is_dir() => {
+                Err("Default Playlist Location: no such folder (leave it empty for none)".into())
+            }
+            Field::TitleFormat | Field::Proxy | Field::SoundFont | Field::PlaylistDir => Ok(()),
         }
     }
 
@@ -666,6 +675,7 @@ impl Field {
             Field::CrossfadeMs => model.settings_mut().crossfade_ms = n(),
             Field::BufferMs => model.settings_mut().buffer_ms = n(),
             Field::Proxy => model.settings_mut().proxy = text.trim().to_string(),
+            Field::PlaylistDir => model.settings_mut().playlist_dir = text.trim().to_string(),
             Field::SoundFont => model.settings_mut().soundfont = text.trim().to_string(),
             Field::TitleFormat => {
                 if text != model.settings().titlefmt {
@@ -780,6 +790,8 @@ pub struct Preferences {
     font_choice: usize,
     /// The check boxes of the media library types: the tags, the folder tree.
     library_type: [usize; 2],
+    /// The folder the field of the default playlist location was last given, to see when a dialog changes it.
+    playlist_dir_shown: String,
     /// The rows of shortcuts shown (the others are put away until Add
     /// shortcut asks for them), the frame round them and the button.
     shortcut_shown: usize,
@@ -901,6 +913,18 @@ impl Preferences {
                         library_type[n] = form.add_on(page, r, check);
                     }
                     y += 30 + 2 * 22;
+                    // Where the playlist dialogs start: a button picks the folder, the field shows it.
+                    form.add_on(page, Rect::new(x0, y, cw, 22 + 28), Widget::Group { label: "Default Playlist Location".into() });
+                    form.add_on(
+                        page,
+                        Rect::new(x0 + 12, y + 20, BUTTON.0, 24),
+                        Widget::Button { label: "Set folder".into(), action: Act::SetPlaylistFolder, default: false },
+                    );
+                    let text = Field::PlaylistDir.get(s);
+                    let cursor = text.chars().count();
+                    let input = Rect::new(x0 + 12 + BUTTON.0 + 8, y + 20, cw - 24 - BUTTON.0 - 8, 24);
+                    fields.push((Field::PlaylistDir, form.add_on(page, input, Widget::Input { text, cursor })));
+                    y += 30 + 28;
                 }
                 Section::Font => {
                     // A font from a `fonts` folder, and its size beside it.
@@ -1044,6 +1068,7 @@ impl Preferences {
             fonts,
             font_choice,
             library_type,
+            playlist_dir_shown: s.playlist_dir.clone(),
             shortcut_shown: shortcut_rules,
             shortcut_frame,
             shortcut_add,
@@ -1165,6 +1190,10 @@ impl Preferences {
                 model.set_library_type(tree);
                 true
             }
+            Event::Clicked(Act::SetPlaylistFolder) => {
+                model.request_dialog(crate::dialogs::DialogKind::PlaylistFolder);
+                true
+            }
             Event::Clicked(Act::Ok) => self.apply(model),
             Event::Clicked(Act::Apply) => {
                 // The same as OK, and the window stays.
@@ -1181,6 +1210,19 @@ impl Preferences {
             Event::Clicked(_) | Event::Cancel => false,
             _ => true,
         }
+    }
+
+    /// A folder picked in the dialog shows in its field.
+    fn refresh(&mut self, model: &Model) -> bool {
+        let now = &model.settings().playlist_dir;
+        if *now == self.playlist_dir_shown {
+            return false;
+        }
+        self.playlist_dir_shown = now.clone();
+        if let Some(&(_, i)) = self.fields.iter().find(|(f, _)| *f == Field::PlaylistDir) {
+            self.form.set_text(i, now);
+        }
+        true
     }
 
     /// Stores the typed values when all are valid; otherwise shows the first
@@ -1679,6 +1721,32 @@ pub(crate) mod tests {
         assert!(press(&mut p, &mut m, Key::Enter));
         assert!(!press(&mut p, &mut m, Key::Escape));
         assert_eq!(m.playlist.current(), None);
+    }
+
+    #[test]
+    fn set_folder_in_the_library_section_asks_for_a_folder_and_shows_it_in_its_field() {
+        let mut m = songs(&["Alpha"]);
+        let dir = std::env::temp_dir();
+        let mut p = Panel::open(PanelKind::Preferences, &m);
+        assert!(p.handle(Event::Clicked(Act::SetPlaylistFolder), &mut m), "the window stays");
+        assert!(matches!(m.ui.last(), Some(UiReq::Dialog(crate::dialogs::DialogKind::PlaylistFolder, _))));
+        assert!(!p.refresh(&m), "nothing picked yet");
+        m.on_dialog(crate::dialogs::DialogResult {
+            kind: crate::dialogs::DialogKind::PlaylistFolder,
+            values: vec![dir.to_string_lossy().into_owned()],
+        });
+        assert!(p.refresh(&m), "the folder is in the field");
+        let Panel::Prefs(pr) = &p else { panic!() };
+        let &(_, i) = pr.fields.iter().find(|(f, _)| *f == Field::PlaylistDir).unwrap();
+        assert_eq!(pr.form.text(i), dir.to_string_lossy());
+        // The playlist dialogs start there.
+        m.request_dialog(crate::dialogs::DialogKind::LoadPlaylist);
+        let Some(UiReq::Dialog(_, crate::dialogs::Request::Files { start, .. })) = m.ui.last() else { panic!("no dialog") };
+        assert_eq!(start.as_deref(), Some(dir.as_path()));
+        // A typed folder that is not there is refused on OK.
+        let Panel::Prefs(pr) = &mut p else { panic!() };
+        pr.form.set_text(i, "/no/such/folder/here");
+        assert!(p.handle(Event::Clicked(Act::Ok), &mut m), "kept open with the problem shown");
     }
 
     #[test]

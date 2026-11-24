@@ -21,6 +21,17 @@
 ------------------------------------------------------------------------------
 
 
+  2026-11-24   DEFAULT PLAYLIST LOCATION
+  ..........................................................................
+
+  Preferences > Media Library > Default Playlist Location
+
+  Press "Set folder", pick a folder in the Windows dialog and press
+  "Select Folder"; its path (for example d:\playlists) shows in the field
+  beside the button. Load playlist and Save playlist then start in that
+  folder. Clear the field to go back to the folder of the last file.
+
+
   2026-11-22   HISTORY FOLDER IN THE MEDIA LIBRARY
   ..........................................................................
 
